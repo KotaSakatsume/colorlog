@@ -19,3 +19,13 @@ export function useColorScheme() {
 
   return 'light';
 }
+
+/**
+ * Normalizes the (hydration-aware) web color scheme to a concrete theme key.
+ * Anything other than `'dark'` falls back to `'light'`, matching the native
+ * implementation and the existing tab layout logic.
+ */
+export function useThemeScheme(): 'light' | 'dark' {
+  const scheme = useColorScheme();
+  return scheme === 'dark' ? 'dark' : 'light';
+}
