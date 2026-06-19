@@ -41,6 +41,37 @@ This command will move the starter code to the **app-example** directory and cre
 - If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
 - Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
 
+## Security rules tests (Firestore / Storage)
+
+The Firestore/Storage security rules (`firestore.rules` / `storage.rules`) are
+verified with [`@firebase/rules-unit-testing`](https://firebase.google.com/docs/rules/unit-tests).
+These tests **require the Firebase emulators** and are kept separate from the
+default `npm test` (which stays at the existing unit-test count and needs no
+emulator).
+
+Prerequisites (host side):
+
+- **Java (JDK 11+)** — required by the Firebase emulators.
+- **firebase-tools** — `npm i -g firebase-tools`.
+
+Run:
+
+```bash
+npm run test:rules
+```
+
+This wraps the rules tests in `firebase emulators:exec --only firestore,storage`,
+which boots the emulators, injects `FIRESTORE_EMULATOR_HOST` /
+`FIREBASE_STORAGE_EMULATOR_HOST`, and runs `jest --config jest.rules.config.js`
+against `tests/rules/**`. Without the emulators the tests fail on connection
+(host/port not discoverable) by design — that is not a code failure.
+
+Notes:
+
+- The default `npm test` excludes `tests/rules/` (`testPathIgnorePatterns` in
+  `jest.config.js`), so the rules tests never run in the default suite.
+- `npx tsc --noEmit` still type-checks `tests/rules/**`; keep them type-clean.
+
 ## Learn more
 
 To learn more about developing your project with Expo, look at the following resources:

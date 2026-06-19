@@ -14,4 +14,7 @@ module.exports = {
     '^@/(.*)$': '<rootDir>/src/$1',
   },
   testMatch: ['**/*.test.ts', '**/*.test.tsx'],
+  // セキュリティルールのテスト（tests/rules/**）はエミュレータ接続必須のため、
+  // デフォルト jest からは確実に除外する（jest.rules.config.js + npm run test:rules で実行）。
+  testPathIgnorePatterns: ['/node_modules/', '/tests/rules/'],
 };
