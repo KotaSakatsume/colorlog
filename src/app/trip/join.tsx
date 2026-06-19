@@ -12,17 +12,30 @@ import { useTheme } from '@/hooks/use-theme';
 
 export default function JoinTripScreen() {
   const theme = useTheme();
-  const { trips: tripRepo } = useRepositories();
+  const { trips: tripRepo, auth } = useRepositories();
   const user = useCurrentUser();
 
   const [code, setCode] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [linking, setLinking] = useState(false);
   const deepLinkCode = useDeepLinkCode();
 
   // QR/ディープリンク経由で開かれたら、招待コードを入力欄へ自動投入する。
   useEffect(() => {
     if (deepLinkCode) setCode(deepLinkCode);
   }, [deepLinkCode]);
+
+  // 匿名ユーザー向けの非ブロッキング導線。連携の成否は参加フローに連動させない。
+  async function handleLinkApple() {
+    setLinking(true);
+    try {
+      await auth.linkWithApple();
+    } catch (e) {
+      Alert.alert('連携に失敗しました', String(e instanceof Error ? e.message : e));
+    } finally {
+      setLinking(false);
+    }
+  }
 
   async function handleJoin() {
     // 招待コードは数字のみ。入力中は加工せず、送信時にだけ数字へ正規化する。
@@ -62,6 +75,19 @@ export default function JoinTripScreen() {
         <ThemedText type="small" themeColor="textSecondary" style={styles.hint}>
           お試し: 123456（未参加トリップに新規参加）/ 111111・222222（参加済み）
         </ThemedText>
+        {user.isAnonymous ? (
+          <View style={styles.linkCta}>
+            <ThemedText type="small" themeColor="textSecondary">
+              Apple と連携すると端末を変えてもアルバムを引き継げます。
+            </ThemedText>
+            <UIButton
+              title="Apple と連携してアルバムを守る"
+              variant="secondary"
+              onPress={handleLinkApple}
+              loading={linking}
+            />
+          </View>
+        ) : null}
         <UIButton title="参加する" onPress={handleJoin} loading={submitting} style={styles.submit} />
       </View>
     </ThemedView>
@@ -81,5 +107,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   hint: { marginTop: 4 },
+  linkCta: { marginTop: Spacing.two, gap: Spacing.one },
   submit: { marginTop: Spacing.four },
 });

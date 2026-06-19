@@ -44,7 +44,7 @@ function fromKey(key: string): Date {
 
 export default function CreateTripScreen() {
   const theme = useTheme();
-  const { trips: tripRepo } = useRepositories();
+  const { trips: tripRepo, auth } = useRepositories();
   const host = useCurrentUser();
 
   const todayKey = toKey(new Date());
@@ -53,6 +53,7 @@ export default function CreateTripScreen() {
   const [startKey, setStartKey] = useState(todayKey);
   const [endKey, setEndKey] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [linking, setLinking] = useState(false);
 
   const startDate = fromKey(startKey);
   const endDate = fromKey(endKey ?? startKey);
@@ -89,6 +90,18 @@ export default function CreateTripScreen() {
       setEndKey(pressed);
     }
     // 開始日と同じ日を押した場合は単日（endKey は null のまま）。
+  }
+
+  // 匿名ユーザー向けの非ブロッキング導線。連携の成否は作成フローに連動させない。
+  async function handleLinkApple() {
+    setLinking(true);
+    try {
+      await auth.linkWithApple();
+    } catch (e) {
+      Alert.alert('連携に失敗しました', String(e instanceof Error ? e.message : e));
+    } finally {
+      setLinking(false);
+    }
   }
 
   async function handleCreate() {
@@ -158,6 +171,20 @@ export default function CreateTripScreen() {
           作成すると招待コードが発行されます。色は参加者が揃ってから配布します。
         </ThemedText>
 
+        {host.isAnonymous ? (
+          <View style={styles.linkCta}>
+            <ThemedText type="small" themeColor="textSecondary">
+              Apple と連携すると端末を変えてもアルバムを引き継げます。
+            </ThemedText>
+            <UIButton
+              title="Apple と連携してアルバムを守る"
+              variant="secondary"
+              onPress={handleLinkApple}
+              loading={linking}
+            />
+          </View>
+        ) : null}
+
         <UIButton
           title="作成する"
           onPress={handleCreate}
@@ -195,5 +222,6 @@ const styles = StyleSheet.create({
     marginTop: Spacing.two,
   },
   note: { marginTop: Spacing.two },
+  linkCta: { marginTop: Spacing.two, gap: Spacing.one },
   submit: { marginTop: Spacing.four },
 });

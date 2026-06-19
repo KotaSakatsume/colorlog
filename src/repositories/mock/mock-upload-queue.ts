@@ -195,7 +195,10 @@ export class MockUploadQueue {
     try {
       // 設計§93: レート制限(lastPostAt 最小間隔)整合の集約点。逐次処理点にフックを1か所だけ確保。
       await this.rateLimitGate(job);
-      const user: AuthUser = job.user;
+      // UploadJob.user は JSON 永続化用の独立構造型（isAnonymous を持たない）。
+      // promotePhoto に渡す AuthUser を境界で復元する。isAnonymous は promotePhoto の
+      // 挙動に影響しない（uid/displayName/photoURL のみ参照）ため既定 false を補う。
+      const user: AuthUser = { ...job.user, isAnonymous: false };
       await this.deps.promotePhoto({
         tripId: job.tripId,
         user,

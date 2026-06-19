@@ -9,7 +9,7 @@ import { MockUploadQueue, UPLOAD_QUEUE_KEY } from './mock-upload-queue';
 function makeInput(slotIndex: number, uri = 'file://photo.jpg'): PromotePhotoInput {
   return {
     tripId: 'trip1',
-    user: { uid: 'owner', displayName: 'Owner' },
+    user: { uid: 'owner', displayName: 'Owner', isAnonymous: false },
     slotIndex,
     localImage: { uri },
     caption: 'c',
@@ -420,7 +420,7 @@ describe('MockUploadQueue: 複数 tripId の emit 分離（穴3）', () => {
     // trip1 にだけ enqueue。
     await q.enqueue({
       tripId: 'trip1',
-      user: { uid: 'owner', displayName: 'Owner' },
+      user: { uid: 'owner', displayName: 'Owner', isAnonymous: false },
       slotIndex: 0,
       localImage: { uri: 'file://a.jpg' },
       caption: 'c',
