@@ -1,9 +1,11 @@
+import { createAsyncStorageStore } from '@/repositories/storage';
 import type { Repositories } from '@/repositories/types';
 
 import { MockAuthService } from './mock-auth-service';
 import { MockBackend } from './mock-backend';
 import { MockPostRepository } from './mock-post-repository';
 import { MockTripRepository } from './mock-trip-repository';
+import { MockUploadQueue } from './mock-upload-queue';
 import { seedMockData } from './seed';
 
 /**
@@ -13,10 +15,17 @@ import { seedMockData } from './seed';
 export function createMockRepositories(): Repositories {
   const db = new MockBackend();
   seedMockData(db);
+  // uploadQueue は posts.promotePhoto を注入するため、posts を先に const 化して組み立てる。
+  const posts = new MockPostRepository(db);
+  const uploadQueue = new MockUploadQueue({
+    promotePhoto: (input) => posts.promotePhoto(input),
+    store: createAsyncStorageStore(),
+  });
   return {
     auth: new MockAuthService(),
     trips: new MockTripRepository(db),
-    posts: new MockPostRepository(db),
+    posts,
+    uploadQueue,
   };
 }
 

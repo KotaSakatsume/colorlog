@@ -8,10 +8,12 @@ import { ThemedView } from '@/components/themed-view';
 import { UIButton } from '@/components/ui-button';
 import { Spacing } from '@/constants/theme';
 import { isTripOver } from '@/domain/format';
+import { countOccupiedSlots, mergeBestNine } from '@/domain/merge-best-nine';
 import { BEST_NINE_SLOTS } from '@/domain/types';
 import { useCurrentUser, useRepositories } from '@/repositories/context';
 import { useTheme } from '@/hooks/use-theme';
 import { useTrip, useTripPosts } from '@/hooks/use-trips';
+import { useTripUploadJobs } from '@/hooks/use-upload-jobs';
 
 const CAPTION_MAX = 200;
 
@@ -28,12 +30,15 @@ export default function ComposeScreen() {
   const params = useLocalSearchParams<{ id: string; slot?: string }>();
   const tripId = params.id;
   const user = useCurrentUser();
-  const { posts: postRepo } = useRepositories();
+  const { uploadQueue } = useRepositories();
   const { trip } = useTrip(tripId);
   const { posts } = useTripPosts(tripId);
+  const jobs = useTripUploadJobs(tripId);
 
-  const myPosts = posts.filter((p) => p.userId === user.uid);
-  const filledSlots = new Set(myPosts.map((p) => p.slotIndex));
+  // 確定 Post と送信中ジョブをマージ。送信中スロットも「埋まり」扱いして即「送信中」表示を出す。
+  const cells = mergeBestNine(posts, jobs, user.uid);
+  // 空き枠判定専用: 送信中ジョブだけのスロットも埋まり扱い（初期スロットを空きへ寄せる用途）。
+  const filledSlots = new Set(cells.filter((c) => c.state !== 'empty').map((c) => c.slotIndex));
   const myColor = trip?.members[user.uid]?.color;
 
   const candidates = useCandidates(`${tripId}-${user.uid}`);
@@ -68,7 +73,11 @@ export default function ComposeScreen() {
     );
   }
 
-  const isReplacing = targetSlot !== undefined && filledSlots.has(targetSlot);
+  // 削除警告（差し替え）は「確定 Post が実在するスロット」限定。送信中ジョブだけのスロットは
+  // 後勝ち上書きされるだけで何も削除されないため、嘘の削除警告を出さない（should-2）。
+  const isReplacing =
+    targetSlot !== undefined &&
+    cells.find((c) => c.slotIndex === targetSlot)?.post != null;
 
   async function publish() {
     if (!selected) {
@@ -83,7 +92,9 @@ export default function ComposeScreen() {
     const run = async () => {
       setSubmitting(true);
       try {
-        await postRepo.promotePhoto({
+        // 撮影フローを止めない: enqueue は即 pending ジョブを返すので、確定を待たず戻る。
+        // 実際の promotePhoto は UploadQueue のプロセッサが裏で確定する（即「送信中」表示）。
+        await uploadQueue.enqueue({
           tripId,
           user,
           slotIndex: targetSlot,
@@ -145,14 +156,17 @@ export default function ComposeScreen() {
           公開先（ベスト9）
         </ThemedText>
         <ThemedText type="small" themeColor="textSecondary">
-          {myPosts.length >= BEST_NINE_SLOTS
+          {countOccupiedSlots(cells) >= BEST_NINE_SLOTS
             ? '9枠が埋まっています。差し替える1枚をタップしてください。'
             : '空き枠をタップ、または埋まった枠をタップして差し替えできます。'}
         </ThemedText>
         <View style={styles.slotGrid}>
-          {Array.from({ length: BEST_NINE_SLOTS }, (_, slot) => {
-            const post = myPosts.find((p) => p.slotIndex === slot) ?? null;
+          {cells.map((cell) => {
+            const slot = cell.slotIndex;
             const isTarget = targetSlot === slot;
+            const occupied = cell.state !== 'empty';
+            // 送信中ジョブは localImage、確定 Post はサムネを出す。
+            const uri = cell.job ? cell.job.localImage.uri : cell.post?.thumbURL;
             return (
               <Pressable
                 key={slot}
@@ -161,12 +175,19 @@ export default function ComposeScreen() {
                   styles.slot,
                   { backgroundColor: `${myColor.hex}22`, borderColor: isTarget ? myColor.hex : 'transparent' },
                 ]}>
-                {post ? (
-                  <Image source={{ uri: post.thumbURL }} style={styles.slotImg} contentFit="cover" />
+                {uri ? (
+                  <Image source={{ uri }} style={styles.slotImg} contentFit="cover" />
                 ) : (
                   <ThemedText style={[styles.plus, { color: myColor.hex }]}>＋</ThemedText>
                 )}
-                {isTarget && post && (
+                {cell.job && (
+                  <View style={styles.replaceTag}>
+                    <ThemedText type="small" style={{ color: '#fff' }}>
+                      {cell.state === 'failed' ? '再送' : '送信中'}
+                    </ThemedText>
+                  </View>
+                )}
+                {isTarget && occupied && !cell.job && (
                   <View style={styles.replaceTag}>
                     <ThemedText type="small" style={{ color: '#fff' }}>
                       差し替え
