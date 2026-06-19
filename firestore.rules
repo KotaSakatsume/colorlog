@@ -1,0 +1,165 @@
+rules_version = '2';
+
+// colorlog Firestore セキュリティルール（SPEC §4 データモデル / §7 / §13.3）
+//
+// 前提:
+// - 本番では App Check（App Attest）を併用する想定（別Issue。ここでは未強制）。
+// - 時刻フィールド（expiresAt / lastPostAt 等）は Firestore Timestamp として保存される
+//   （ドメイン層の Date は Firebase 実装側で Timestamp に変換される）。
+// - 「明示的に許可した条件以外は全 deny」が基本方針。
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /trips/{tripId} {
+      // メンバー判定は安価な memberIds 配列で行う（members マップを走査しない）。
+      function isMember() {
+        return request.auth != null
+          && request.auth.uid in resource.data.memberIds;
+      }
+
+      // ホスト判定（色配布トランザクションの主体。SPEC §5-1）。
+      function isHost() {
+        return request.auth != null
+          && request.auth.uid == resource.data.hostUserId;
+      }
+
+      // 自メンバー更新で「触ってはいけないトップレベル不変フィールド」が
+      // 変わっていないことを検証する（host 乗っ取り・memberIds 改竄・配布フラグ改竄の封じ込め）。
+      // SPEC §4 のデータモデルのうち、メンバー自身の昇格更新では members[uid] サブキー以外は不変。
+      function immutableOnSelfUpdate() {
+        let before = resource.data;
+        let after = request.resource.data;
+        return after.memberIds == before.memberIds
+          && after.hostUserId == before.hostUserId
+          && after.name == before.name
+          && after.startDate == before.startDate
+          && after.endDate == before.endDate
+          && after.status == before.status
+          && after.colorsAssigned == before.colorsAssigned;
+      }
+
+      // members の変更が「自分の uid のキーのみ」に限定されること。
+      // 他メンバーの postCount/color/lastPostAt 書き換え・追放・read 権限奪取を封じる。
+      function onlyMyMemberChanged() {
+        return request.resource.data.members.diff(resource.data.members)
+                 .affectedKeys().hasOnly([request.auth.uid]);
+      }
+
+      // memberIds への差分が「自分の uid をちょうど1件追加」かを集合演算で検証する。
+      // - 既存要素はすべて残る（消さない/書き換えない）
+      // - 追加された差分は自分の uid のみ
+      // - ちょうど1件増えた（重複追加でない）
+      // - 上限12人（SPEC §61/§198/§279）
+      // さらに参加に伴う members マップの変更も「自分のキー追加のみ」に限定し、
+      // hostUserId 等の構造系を不変にして「参加と同時の他人エントリ混入・host 乗っ取り」を封じる。
+      function isJoiningSelf() {
+        let before = resource.data.memberIds;
+        let after = request.resource.data.memberIds;
+        return request.auth != null
+          && after.toSet().hasAll(before)
+          && after.toSet().difference(before.toSet()).hasOnly([request.auth.uid])
+          && after.size() == before.size() + 1
+          && after.size() <= 12
+          // members 側も「自分のキーのみ」変更（他人エントリ混入・改竄の封じ込め）
+          && request.resource.data.members.diff(resource.data.members)
+               .affectedKeys().hasOnly([request.auth.uid])
+          // hostUserId は不変（参加と同時の host 乗っ取り防止）
+          && request.resource.data.hostUserId == resource.data.hostUserId;
+      }
+
+      // ホストによる色配布（assignColors）。SPEC §5-1: 未配布のときだけ全員分の color を
+      // 1トランザクションで書き、colorsAssigned を立てて status を active にする正当経路。
+      // メンバー自身の昇格更新ルール（onlyMyMemberChanged）では拒否されてしまうため、
+      // host 用の別ブランチで「members 全体の書き込み＋配布フラグ＋status のみ」を許す。
+      // memberIds / hostUserId / name / 期間は不変に固定する。
+      function isHostAssigningColors() {
+        let before = resource.data;
+        let after = request.resource.data;
+        return isHost()
+          // 未配布 → 配布済みへの遷移のみ（再配布は不可）
+          && before.colorsAssigned == false
+          && after.colorsAssigned == true
+          // 構造系は不変（メンバー集合・host・名前・期間を変えない）
+          && after.memberIds == before.memberIds
+          && after.hostUserId == before.hostUserId
+          && after.name == before.name
+          && after.startDate == before.startDate
+          && after.endDate == before.endDate;
+      }
+
+      // postCount は 0..9（9 が満杯。ベスト9）。
+      // members[uid] は optional フィールド（キー不在の可能性）をガードする。
+      // 自分の members エントリを触らない更新（members[uid] 不在）も素通りさせる。
+      function postCountValid() {
+        let uid = request.auth.uid;
+        return !(uid in request.resource.data.members)
+          || !('postCount' in request.resource.data.members[uid])
+          || (request.resource.data.members[uid].postCount >= 0
+              && request.resource.data.members[uid].postCount <= 9);
+      }
+
+      // 連投レート制限（直前投稿から10秒以上）。
+      // 基準時刻は request.time（サーバ時刻）。初投稿（lastPostAt 不在）は無条件OK。
+      // 既存 doc に members[uid] が無い場合もガードする。
+      function rateOk() {
+        let uid = request.auth.uid;
+        return !(uid in resource.data.members)
+          || !('lastPostAt' in resource.data.members[uid])
+          || request.time > resource.data.members[uid].lastPostAt + duration.value(10, 's');
+      }
+
+      // 書き込む lastPostAt は request.time と一致（= serverTimestamp 強制）。
+      // クライアントが過去値を書いて rateOk を回避するのを防ぐ。
+      // lastPostAt を書かない更新（純粋な参加など）・members[uid] 不在は素通り。
+      function serverTimestamped() {
+        let uid = request.auth.uid;
+        return !(uid in request.resource.data.members)
+          || !('lastPostAt' in request.resource.data.members[uid])
+          || request.resource.data.members[uid].lastPostAt == request.time;
+      }
+
+      allow read: if isMember();
+      // 自メンバー更新（昇格に伴う postCount / lastPostAt 更新）はメンバーのみ・
+      // 自分の members[uid] キーのみ変更・トップレベル不変フィールド固定・
+      // postCount 範囲・レート制限・serverTimestamp を満たすこと。
+      // 参加（自分を memberIds + members に追加）は isJoiningSelf で許可。
+      // ホストの色配布（全員分の color を1トランザクションで書く）は isHostAssigningColors で許可。
+      allow update: if (isMember()
+                        && onlyMyMemberChanged()
+                        && immutableOnSelfUpdate()
+                        && postCountValid() && rateOk() && serverTimestamped())
+                    || isJoiningSelf()
+                    || isHostAssigningColors();
+      // 作成はホスト本人のトリップ作成のみ（memberIds は自分1件・hostUserId は自分）。
+      // members も自分のキーのみ・postCount は 0 始まり（mock createTrip と整合）に縛り、
+      // 作成時の他人エントリ混入・postCount 改竄を封じる。
+      allow create: if request.auth != null
+                    && request.resource.data.hostUserId == request.auth.uid
+                    && request.resource.data.memberIds == [request.auth.uid]
+                    && request.resource.data.members.keys().hasOnly([request.auth.uid])
+                    && request.resource.data.members[request.auth.uid].postCount == 0;
+
+      match /posts/{postId} {
+        // posts には memberIds が無いため、親 trip を get() してメンバー判定する
+        // （フィード購読のたびに1回。コスト規律 §13.3 は購読共有 + limit(50) 側で担保）。
+        allow read: if request.auth != null
+          && request.auth.uid in get(/databases/$(database)/documents/trips/$(tripId)).data.memberIds;
+        // create は trip 参照を避ける（get() 課金回避）。
+        // userId は本人・caption は200字以内・slotIndex は 0..8。
+        // postCount<=9 / レート制限は trips の update 側に集約済み（ここには置かない）。
+        allow create: if request.auth != null
+          && request.resource.data.userId == request.auth.uid
+          && request.resource.data.caption.size() <= 200
+          && request.resource.data.slotIndex >= 0
+          && request.resource.data.slotIndex <= 8;
+      }
+    }
+
+    match /inviteCodes/{code} {
+      // 認証済みかつ未失効のみ read 可。期限切れは「読めない」扱い（SPEC §13.3）。
+      allow read: if request.auth != null
+                  && resource.data.expiresAt > request.time;
+      // create/update/delete は今回スコープ外（deny のまま）。
+    }
+  }
+}

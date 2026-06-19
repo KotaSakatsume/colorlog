@@ -57,7 +57,8 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "test": "jest"
+    "test": "jest",
+    "test:rules": "firebase emulators:exec --only firestore,storage \"jest --config jest.rules.config.js\""
   },
   "private": true
 }
