@@ -22,6 +22,8 @@ export type AuthUser = {
   uid: string;
   displayName: string;
   photoURL?: string;
+  /** 匿名ユーザーか。Apple 連携後は false。Mock では初期 true。 */
+  isAnonymous: boolean;
 };
 
 /** 端末内の撮影候補（クラウド外。ベスト9へ昇格した瞬間だけアップロードされる）。 */
@@ -96,6 +98,11 @@ export interface AuthService {
   getCurrentUser(): AuthUser;
   /** 現在ユーザーのプロフィールを更新する。 */
   updateProfile(patch: ProfileUpdate): void;
+  /**
+   * 匿名ユーザーを Apple アカウントへ連携させる（isAnonymous を false 化）。
+   * 連携後ユーザーを返し、購読者にも同値を通知する。既に連携済みなら冪等（現ユーザーを返す）。
+   */
+  linkWithApple(): Promise<AuthUser>;
   /** 現在ユーザーの変更を購読する（登録直後に現在値を即時通知）。 */
   subscribe(listener: (user: AuthUser) => void): Unsubscribe;
 }

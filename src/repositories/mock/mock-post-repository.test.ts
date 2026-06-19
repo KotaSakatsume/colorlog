@@ -10,7 +10,7 @@ import { MockPostRepository } from './mock-post-repository';
 const BLUE = COLOR_POOL[0];
 
 function makeUser(uid: string): AuthUser {
-  return { uid, displayName: uid };
+  return { uid, displayName: uid, isAnonymous: false };
 }
 
 /** 期間内（差し替え可能）の配布済みトリップを作る。 */
