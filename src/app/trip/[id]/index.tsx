@@ -10,10 +10,12 @@ import { UIButton } from '@/components/ui-button';
 import { Spacing } from '@/constants/theme';
 import { contrastTextColor } from '@/domain/colors';
 import { STATUS_LABEL, formatDateRange, isTripOver } from '@/domain/format';
+import { countOccupiedSlots, mergeBestNine } from '@/domain/merge-best-nine';
 import { BEST_NINE_SLOTS } from '@/domain/types';
 import { useCurrentUser, useRepositories } from '@/repositories/context';
 import { useTheme } from '@/hooks/use-theme';
 import { useTrip, useTripInviteCode, useTripPosts } from '@/hooks/use-trips';
+import { useTripUploadJobs } from '@/hooks/use-upload-jobs';
 
 /** 破壊的操作（削除）を示す赤。 */
 const DESTRUCTIVE = '#E5484D';
@@ -22,9 +24,10 @@ export default function TripDetailScreen() {
   const theme = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
   const user = useCurrentUser();
-  const { trips: tripRepo } = useRepositories();
+  const { trips: tripRepo, uploadQueue } = useRepositories();
   const { trip, loading } = useTrip(id);
   const { posts } = useTripPosts(id);
+  const jobs = useTripUploadJobs(id);
   const inviteCode = useTripInviteCode(id);
   const [deleting, setDeleting] = useState(false);
 
@@ -38,9 +41,10 @@ export default function TripDetailScreen() {
 
   const me = trip.members[user.uid];
   const myColor = me?.color;
-  const myPosts = posts.filter((p) => p.userId === user.uid);
   const isHost = trip.hostUserId === user.uid;
-  const filled = myPosts.length;
+  // 確定 Post と送信中ジョブを slotIndex でマージ。枚数表示・グリッドはマージ後を真実にする。
+  const cells = mergeBestNine(posts, jobs, user.uid);
+  const filled = countOccupiedSlots(cells);
   const over = isTripOver(trip);
 
   function goCompose(slot?: number) {
@@ -48,6 +52,17 @@ export default function TripDetailScreen() {
       pathname: '/trip/[id]/compose',
       params: { id: trip!.id, ...(slot !== undefined ? { slot: String(slot) } : {}) },
     });
+  }
+
+  // スロットタップの導線（表示と挙動を一致させる）。failed セル（「再送」バッジ）は
+  // その場で uploadQueue.retry(job.id) を呼ぶ。それ以外は compose へ遷移（should-4）。
+  function handlePressSlot(slot: number) {
+    const cell = cells.find((c) => c.slotIndex === slot);
+    if (cell?.state === 'failed' && cell.job) {
+      void uploadQueue.retry(cell.job.id);
+      return;
+    }
+    goCompose(slot);
   }
 
   async function handleAssign() {
@@ -140,10 +155,11 @@ export default function TripDetailScreen() {
               </ThemedText>
             </View>
             <BestNineGrid
-              posts={myPosts}
+              posts={posts}
+              cells={cells}
               color={myColor}
               editable={!over}
-              onPressSlot={over ? undefined : (slot) => goCompose(slot)}
+              onPressSlot={over ? undefined : (slot) => handlePressSlot(slot)}
             />
             {over ? (
               <ThemedText type="small" themeColor="textSecondary" style={styles.cameraBtn}>

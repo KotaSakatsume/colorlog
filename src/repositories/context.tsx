@@ -15,6 +15,11 @@ const RepositoriesContext = createContext<Repositories | null>(null);
 export function RepositoryProvider({ children }: { children: ReactNode }) {
   // アプリ生存期間で1度だけ生成（シードと購読状態を保つ）。
   const repositories = useMemo(() => createMockRepositories(), []);
+  // 送信キューの復元と処理ループを起動する（start は冪等）。
+  // テストでは start() を明示 await して fake timer を制御するため、生成側でなくここで呼ぶ。
+  useEffect(() => {
+    void repositories.uploadQueue.start();
+  }, [repositories]);
   return (
     <RepositoriesContext.Provider value={repositories}>{children}</RepositoriesContext.Provider>
   );

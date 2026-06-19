@@ -5,7 +5,14 @@
  * Mock 実装と Firebase 実装を差し替え可能にするための境界。
  */
 
-import type { InviteCode, Post, ReactionEmoji, ReactionSummary, Trip } from '@/domain/types';
+import type {
+  InviteCode,
+  Post,
+  ReactionEmoji,
+  ReactionSummary,
+  Trip,
+  UploadJob,
+} from '@/domain/types';
 
 /** 購読解除関数 */
 export type Unsubscribe = () => void;
@@ -134,9 +141,33 @@ export interface PostRepository {
   toggleReaction(input: ToggleReactionInput): Promise<ReactionSummary>;
 }
 
+/**
+ * オフライン送信キュー（第4の Repository）。
+ *
+ * 撮影と昇格(promotePhoto)を分離する。enqueue は即 pending ジョブを返して撮影フローを
+ * ブロックせず、注入されたプロセッサが pending を1件ずつ promotePhoto で確定する。
+ * 各 mutation で AsyncStorage（注入された KeyValueStore）へ永続化し、tripId 単位で emit する。
+ */
+export interface UploadQueue {
+  /** ジョブを積み、即 pending ジョブを返す（撮影フローをブロックしない）。永続化と emit も行う。 */
+  enqueue(input: PromotePhotoInput): Promise<UploadJob>;
+  /** トリップ単位で未確定ジョブ一覧を購読する（登録直後に現在値を即時通知）。 */
+  subscribe(tripId: string, listener: (jobs: UploadJob[]) => void): Unsubscribe;
+  /** failed ジョブを pending に戻して再処理を促す。 */
+  retry(jobId: string): Promise<void>;
+  /** ジョブをキューから除去する（ユーザー取消 / 成功後の内部除去）。 */
+  remove(jobId: string): Promise<void>;
+  /**
+   * 永続化からの復元と処理ループを開始する（冪等）。
+   * Provider の useEffect で1回だけ呼ぶ。テストは明示的に await して制御する。
+   */
+  start(): Promise<void>;
+}
+
 /** 画面へ注入する Repository の束。 */
 export type Repositories = {
   auth: AuthService;
   trips: TripRepository;
   posts: PostRepository;
+  uploadQueue: UploadQueue;
 };
