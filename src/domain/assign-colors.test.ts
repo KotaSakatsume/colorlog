@@ -37,6 +37,20 @@ function makeTrip(memberCount: number, overrides: Partial<Trip> = {}): Trip {
 /** 入力をそのまま返す決定的シャッフル（配布順を予測可能にする）。 */
 const identityShuffle = <T>(items: readonly T[]): T[] => [...items];
 
+describe('COLOR_POOL (SPEC §6)', () => {
+  it('ちょうど12色を持ち、MAX_MEMBERS と一致する', () => {
+    expect(COLOR_POOL).toHaveLength(12);
+    expect(MAX_MEMBERS).toBe(12);
+  });
+
+  it('hex も名前も重複しない', () => {
+    const hexes = COLOR_POOL.map((c) => c.hex);
+    const names = COLOR_POOL.map((c) => c.name);
+    expect(new Set(hexes).size).toBe(12);
+    expect(new Set(names).size).toBe(12);
+  });
+});
+
 describe('assignColorsToTrip', () => {
   it('全メンバーに互いに異なる色を割り当てる', () => {
     const trip = makeTrip(4);
@@ -76,16 +90,19 @@ describe('assignColorsToTrip', () => {
     expect(() => assignColorsToTrip(once)).toThrow(ColorsAlreadyAssignedError);
   });
 
-  it('ちょうど12人なら配布できる', () => {
+  it('ちょうど12人なら全員に異なる色を配布できる', () => {
     const trip = makeTrip(MAX_MEMBERS);
+    expect(trip.memberIds).toHaveLength(12); // MAX_MEMBERS = 12 の明示確認
     const result = assignColorsToTrip(trip);
 
     const hexes = trip.memberIds.map((uid) => result.members[uid].color!.hex);
+    expect(new Set(hexes).size).toBe(12); // 12色すべてが重複なく配られる
     expect(new Set(hexes).size).toBe(MAX_MEMBERS);
   });
 
-  it('12人を超えると TooManyMembersError', () => {
+  it('13人目（12人超）で TooManyMembersError', () => {
     const trip = makeTrip(MAX_MEMBERS + 1);
+    expect(trip.memberIds).toHaveLength(13);
     expect(() => assignColorsToTrip(trip)).toThrow(TooManyMembersError);
   });
 
