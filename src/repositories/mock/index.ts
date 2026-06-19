@@ -3,6 +3,7 @@ import type { Repositories } from '@/repositories/types';
 
 import { MockAuthService } from './mock-auth-service';
 import { MockBackend } from './mock-backend';
+import { MockImageProcessor } from './mock-image-processor';
 import { MockPostRepository } from './mock-post-repository';
 import { MockTripRepository } from './mock-trip-repository';
 import { MockUploadQueue } from './mock-upload-queue';
@@ -26,6 +27,7 @@ export function createMockRepositories(): Repositories {
     trips: new MockTripRepository(db),
     posts,
     uploadQueue,
+    imageProcessor: new MockImageProcessor(),
   };
 }
 

@@ -31,6 +31,28 @@ export type LocalImage = {
   height?: number;
 };
 
+/** リサイズ済みの1枚（本画像 or サムネ）。width/height は実体寸法（将来の Firestore 書き込み用前方データ）。 */
+export type ProcessedImage = {
+  uri: string;
+  width: number;
+  height: number;
+};
+
+/** `ImageProcessor.process` の結果。本画像（長辺1600）とサムネ（長辺400）の2サイズ。 */
+export type ProcessedImages = {
+  main: ProcessedImage;
+  thumb: ProcessedImage;
+};
+
+/**
+ * 1枚の端末内画像を本画像・サムネの2サイズへ整える境界。
+ * 寸法決定は domain の computeTargetSize に委譲し、Mock（node 完結）と
+ * Expo（expo-image-manipulator）を DI で差し替える。実 Storage へのアップロードは別Issue。
+ */
+export interface ImageProcessor {
+  process(input: LocalImage): Promise<ProcessedImages>;
+}
+
 export type CreateTripInput = {
   name: string;
   startDate: Date;
@@ -170,4 +192,5 @@ export type Repositories = {
   trips: TripRepository;
   posts: PostRepository;
   uploadQueue: UploadQueue;
+  imageProcessor: ImageProcessor;
 };
