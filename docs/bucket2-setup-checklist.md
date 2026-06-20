@@ -13,26 +13,26 @@
 
 ---
 
-## ゲートA: rules テストを緑にする（ローカルのみ・Firebase アカウント不要）
-**目的**: Issue #6 のセキュリティルールを実エミュレータで実行検証する。現状この環境では Java も firebase CLI も無く未実行。
+## ✅ ゲートA: rules テストを緑にする（ローカルのみ・Firebase アカウント不要）— 完了（2026-06-20）
+**目的**: Issue #6 のセキュリティルールを実エミュレータで実行検証する。
+**結果**: firebase-tools 15.22.0 + Temurin JDK 21 を導入し `npm run test:rules` を実行 → **2 suites / 45 tests 全 pass**（exit 0）。攻撃系の deny・正当系の allow がすべて成立し、未検証だった `map[key]` 存在ガードと `isHostAssigningColors` の挙動も実機で正しいことを確認（PR #7 の宿題は解消）。
 
-- [ ] **Java を入れる**（Firestore エミュレータが要求）。macOS なら:
+再現手順（次の環境・CI 用）:
+- [x] **firebase-tools を入れる**: `npm install -g firebase-tools`
+- [x] **Java を入れる**（Firestore エミュレータが要求）。⚠️ `brew install --cask temurin` は管理者権限、`brew install openjdk` はこの環境（macOS Monterey/x86）で**ビットル不在によりソースビルドに落ち極めて遅い**。**プレビルト Temurin tarball が速い・sudo不要**:
   ```bash
-  brew install --cask temurin
-  java -version   # 動けばOK
+  mkdir -p ~/.local/java
+  curl -fL -o /tmp/temurin21.tar.gz "https://api.adoptium.net/v3/binary/latest/21/ga/mac/x64/jdk/hotspot/normal/eclipse"
+  tar -xzf /tmp/temurin21.tar.gz -C ~/.local/java
+  export JAVA_HOME="$(ls -d ~/.local/java/jdk-*/Contents/Home | head -1)"
+  export PATH="$JAVA_HOME/bin:$PATH"
+  java -version
   ```
-- [ ] **firebase-tools を入れる**:
+- [x] **rules テストを実行**（emulator 起動→テスト→自動終了。ログイン不要。`test:rules` は `--project demo-colorlog` 指定済みでアカウント不要）:
   ```bash
-  npm install -g firebase-tools
-  firebase --version
+  cd colorlog54 && npm run test:rules
   ```
-- [ ] **rules テストを実行**（emulator 起動→テスト→自動終了。ログイン不要）:
-  ```bash
-  cd colorlog54
-  npm run test:rules
-  ```
-  - 期待: 攻撃系（他人追放/host乗っ取り/memberIds改竄/期限切れ inviteCode/postCount>9/レート制限/Storage 1.5MiB・非jpeg）の deny と、正当系の allow がすべて pass。
-  - **落ちたら**: ルールの実挙動バグの可能性。特に未検証だった「map[key] 存在ガード（`!(uid in members)`）」と `isHostAssigningColors` の status 無制約 follow-up（PR #7 記載）をこのタイミングで詰める。私（Claude）に結果を貼ってくれれば修正パイプラインを回す。
+  - 期待（達成済み）: 攻撃系（他人追放/host乗っ取り/memberIds改竄/期限切れ inviteCode/postCount>9/レート制限/Storage 1.5MiB・非jpeg）の deny と、正当系の allow がすべて pass。
 
 ---
 
