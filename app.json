@@ -46,6 +46,14 @@
         {
           "photosPermission": "プロフィール写真の選択に使用します"
         }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "useFrameworks": "static"
+          }
+        }
       ]
     ],
     "experiments": {
