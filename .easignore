@@ -1,0 +1,35 @@
+# EAS Build はこのファイルがあると .gitignore の代わりにこれを使う。
+# 目的: gitignore している GoogleService-Info.plist だけは EAS ビルドに含める
+# （iOS の Firebase 設定はビルド時に必要だが、公開リポジトリには載せたくないため）。
+# ここに列挙したものはアップロードしない。plist は意図的に除外していない。
+
+# dependencies / generated
+node_modules/
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# generated native folders（EAS が prebuild で再生成する）
+/ios
+/android
+
+# 署名・鍵（EAS の credentials 管理に任せる。アップロードしない）
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.pem
+.env*.local
+
+# misc
+.kotlin/
+.metro-health-check*
+*.tsbuildinfo
+.DS_Store
+*.log
+.jesttmp/
+
+# パイプライン成果物（ビルドに不要・アップロード削減）
+docs/pipeline/
