@@ -58,7 +58,7 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "test": "jest",
-    "test:rules": "firebase emulators:exec --only firestore,storage \"jest --config jest.rules.config.js\""
+    "test:rules": "firebase emulators:exec --project demo-colorlog --only firestore,storage \"jest --config jest.rules.config.js\""
   },
   "private": true
 }
