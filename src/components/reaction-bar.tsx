@@ -3,6 +3,8 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { REACTION_EMOJIS, type ReactionEmoji, type ReactionSummary } from '@/domain/types';
 import { ThemedText } from '@/components/themed-text';
+import { Radius, Tint, shadow } from '@/constants/theme';
+import { useThemeScheme } from '@/hooks/use-color-scheme';
 import { useTheme } from '@/hooks/use-theme';
 
 type Props = {
@@ -22,6 +24,7 @@ type Props = {
  */
 function ReactionBarBase({ summary, onToggle }: Props) {
   const theme = useTheme();
+  const scheme = useThemeScheme();
   const counts = summary?.counts ?? {};
   const mine = summary?.mine ?? null;
 
@@ -36,9 +39,12 @@ function ReactionBarBase({ summary, onToggle }: Props) {
             onPress={() => onToggle(emoji)}
             style={({ pressed }) => [
               styles.chip,
+              selected ? shadow(1, scheme) : null,
               {
-                backgroundColor: selected ? theme.backgroundSelected : theme.backgroundElement,
-                opacity: pressed ? 0.6 : 1,
+                backgroundColor: selected
+                  ? Tint[scheme].tintSubtle
+                  : theme.backgroundElement,
+                transform: [{ scale: pressed ? 0.94 : 1 }],
               },
             ]}>
             <ThemedText type="small">{emoji}</ThemedText>

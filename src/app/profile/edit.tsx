@@ -7,12 +7,14 @@ import { Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { UIButton } from '@/components/ui-button';
-import { Spacing } from '@/constants/theme';
+import { Spacing, Tint } from '@/constants/theme';
 import { useCurrentUser, useRepositories } from '@/repositories/context';
+import { useThemeScheme } from '@/hooks/use-color-scheme';
 import { useTheme } from '@/hooks/use-theme';
 
 export default function EditProfileScreen() {
   const theme = useTheme();
+  const scheme = useThemeScheme();
   const { auth } = useRepositories();
   const user = useCurrentUser();
 
@@ -54,7 +56,12 @@ export default function EditProfileScreen() {
             {photoURL ? (
               <Image source={{ uri: photoURL }} style={styles.avatar} contentFit="cover" />
             ) : (
-              <View style={[styles.avatar, styles.avatarFallback]}>
+              <View
+                style={[
+                  styles.avatar,
+                  styles.avatarFallback,
+                  { backgroundColor: Tint[scheme].tint },
+                ]}>
                 <ThemedText type="title" style={styles.avatarText}>
                   {displayName.slice(0, 1) || '?'}
                 </ThemedText>
@@ -62,7 +69,9 @@ export default function EditProfileScreen() {
             )}
           </Pressable>
           <Pressable onPress={pickImage} hitSlop={8}>
-            <ThemedText type="smallBold" style={styles.changePhoto}>
+            <ThemedText
+              type="smallBold"
+              style={[styles.changePhoto, { color: Tint[scheme].tint }]}>
               写真を変更
             </ThemedText>
           </Pressable>
@@ -104,12 +113,11 @@ const styles = StyleSheet.create({
   avatarSection: { alignItems: 'center', gap: 8, paddingVertical: Spacing.three },
   avatar: { width: AVATAR, height: AVATAR, borderRadius: AVATAR / 2 },
   avatarFallback: {
-    backgroundColor: '#208AEF',
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarText: { color: '#FFFFFF', fontSize: 40 },
-  changePhoto: { color: '#208AEF' },
+  changePhoto: {},
   label: { marginTop: Spacing.three, marginBottom: 4 },
   input: {
     borderRadius: 12,

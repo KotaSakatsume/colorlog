@@ -2,8 +2,10 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ColorChip } from '@/components/color-chip';
 import { ThemedText } from '@/components/themed-text';
+import { Radius, shadow } from '@/constants/theme';
 import { formatDateRange, STATUS_LABEL, memberCount } from '@/domain/format';
 import type { Trip } from '@/domain/types';
+import { useThemeScheme } from '@/hooks/use-color-scheme';
 import { useTheme } from '@/hooks/use-theme';
 
 type Props = {
@@ -15,6 +17,7 @@ type Props = {
 /** ホームのトリップ一覧カード。自分の色・期間・人数・状態を表示する。 */
 export function TripCard({ trip, currentUserId, onPress }: Props) {
   const theme = useTheme();
+  const scheme = useThemeScheme();
   const myColor = trip.members[currentUserId]?.color;
 
   return (
@@ -22,7 +25,11 @@ export function TripCard({ trip, currentUserId, onPress }: Props) {
       onPress={onPress}
       style={({ pressed }) => [
         styles.card,
-        { backgroundColor: theme.backgroundElement, opacity: pressed ? 0.9 : 1 },
+        shadow(2, scheme),
+        {
+          backgroundColor: theme.backgroundElement,
+          transform: [{ scale: pressed ? 0.98 : 1 }],
+        },
       ]}>
       {/* 左の色バー（未配布はグレー） */}
       <View
@@ -59,11 +66,11 @@ export function TripCard({ trip, currentUserId, onPress }: Props) {
 const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
-    borderRadius: 16,
+    borderRadius: Radius.lg,
     overflow: 'hidden',
   },
   colorBar: {
-    width: 8,
+    width: 10,
   },
   body: {
     flex: 1,
