@@ -6,6 +6,7 @@ import type { BestNineCell } from '@/domain/merge-best-nine';
 import { mergeBestNine } from '@/domain/merge-best-nine';
 import { BEST_NINE_SLOTS, type Post } from '@/domain/types';
 import { ThemedText } from '@/components/themed-text';
+import { Radius } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 type Props = {
@@ -39,12 +40,20 @@ export function BestNineGrid({ posts, cells, color, onPressSlot, editable = fals
         // 送信中 Job のプレースホルダ画像は localImage、無ければ確定 Post のサムネ。
         const uri = job ? job.localImage.uri : post?.thumbURL;
         const recyclingKey = job ? job.id : post?.id;
+        // 埋まりセルは所有者色の細フレームでアイデンティティを縁取る。
+        const filled = !!uri;
         return (
           <Pressable
             key={slot}
             disabled={!onPressSlot}
             onPress={() => onPressSlot?.(slot, post)}
-            style={[styles.slot, { backgroundColor: tint }]}>
+            style={[
+              styles.slot,
+              { backgroundColor: tint },
+              filled && color
+                ? { borderWidth: 1.5, borderColor: color.hex }
+                : null,
+            ]}>
             {uri ? (
               <Image
                 source={{ uri }}
@@ -113,7 +122,7 @@ const styles = StyleSheet.create({
     flexBasis: '31%',
     flexGrow: 1,
     aspectRatio: 1,
-    borderRadius: 10,
+    borderRadius: Radius.md,
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',

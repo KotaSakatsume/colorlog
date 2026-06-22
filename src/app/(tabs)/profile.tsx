@@ -8,15 +8,17 @@ import { ColorChip } from '@/components/color-chip';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { UIButton } from '@/components/ui-button';
-import { BottomTabInset, Spacing } from '@/constants/theme';
+import { BottomTabInset, Spacing, Tint } from '@/constants/theme';
 import { COLOR_POOL } from '@/domain/colors';
 import { useCurrentUser, useRepositories } from '@/repositories/context';
+import { useThemeScheme } from '@/hooks/use-color-scheme';
 import { useUserTrips } from '@/hooks/use-trips';
 
 export default function ProfileScreen() {
   const user = useCurrentUser();
   const { trips } = useUserTrips();
   const { auth } = useRepositories();
+  const scheme = useThemeScheme();
   const [linking, setLinking] = useState(false);
 
   // 匿名ユーザーを Apple アカウントへ連携させる。状態は useCurrentUser の購読で再描画される。
@@ -39,7 +41,7 @@ export default function ProfileScreen() {
             {user.photoURL ? (
               <Image source={{ uri: user.photoURL }} style={styles.avatar} contentFit="cover" />
             ) : (
-              <View style={styles.avatar}>
+              <View style={[styles.avatar, { backgroundColor: Tint[scheme].tint }]}>
                 <ThemedText type="title" style={styles.avatarText}>
                   {user.displayName.slice(0, 1)}
                 </ThemedText>
@@ -103,7 +105,6 @@ const styles = StyleSheet.create({
     width: 88,
     height: 88,
     borderRadius: 44,
-    backgroundColor: '#208AEF',
     alignItems: 'center',
     justifyContent: 'center',
   },

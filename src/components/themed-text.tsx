@@ -1,15 +1,27 @@
 import { Platform, StyleSheet, Text, type TextProps } from 'react-native';
 
-import { Fonts, ThemeColor } from '@/constants/theme';
+import { Fonts, ThemeColor, Tint } from '@/constants/theme';
+import { useThemeScheme } from '@/hooks/use-color-scheme';
 import { useTheme } from '@/hooks/use-theme';
 
 export type ThemedTextProps = TextProps & {
-  type?: 'default' | 'title' | 'small' | 'smallBold' | 'subtitle' | 'link' | 'linkPrimary' | 'code';
+  type?:
+    | 'default'
+    | 'title'
+    | 'small'
+    | 'smallBold'
+    | 'subtitle'
+    | 'link'
+    | 'linkPrimary'
+    | 'code'
+    | 'display'
+    | 'hero';
   themeColor?: ThemeColor;
 };
 
 export function ThemedText({ style, type = 'default', themeColor, ...rest }: ThemedTextProps) {
   const theme = useTheme();
+  const scheme = useThemeScheme();
 
   return (
     <Text
@@ -23,6 +35,11 @@ export function ThemedText({ style, type = 'default', themeColor, ...rest }: The
         type === 'link' && styles.link,
         type === 'linkPrimary' && styles.linkPrimary,
         type === 'code' && styles.code,
+        type === 'display' && styles.display,
+        type === 'hero' && styles.hero,
+        // linkPrimary の色はハードコードせず描画時に tint を当てる（hex 集約）。
+        // 先頭の theme[...] より後段に置いて上書きする。
+        type === 'linkPrimary' && { color: Tint[scheme].tint },
         style,
       ]}
       {...rest}
@@ -63,11 +80,24 @@ const styles = StyleSheet.create({
   linkPrimary: {
     lineHeight: 30,
     fontSize: 14,
-    color: '#3c87f7',
   },
   code: {
     fontFamily: Fonts.mono,
     fontWeight: Platform.select({ android: 700 }) ?? 500,
     fontSize: 12,
+  },
+  display: {
+    fontSize: 64,
+    lineHeight: 64,
+    fontWeight: '800',
+    letterSpacing: -1.5,
+    fontFamily: Fonts.rounded,
+  },
+  hero: {
+    fontSize: 28,
+    lineHeight: 34,
+    fontWeight: '800',
+    letterSpacing: -0.4,
+    fontFamily: Fonts.rounded,
   },
 });
