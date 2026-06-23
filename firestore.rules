@@ -139,11 +139,16 @@ service cloud.firestore {
                     && request.resource.data.members.keys().hasOnly([request.auth.uid])
                     && request.resource.data.members[request.auth.uid].postCount == 0;
 
+      // posts のメンバー判定は親 trip を get() で引く（postId 配下で共有して get() 課金を1回に寄せる）。
+      function isPostMember() {
+        return request.auth != null
+          && request.auth.uid in get(/databases/$(database)/documents/trips/$(tripId)).data.memberIds;
+      }
+
       match /posts/{postId} {
         // posts には memberIds が無いため、親 trip を get() してメンバー判定する
         // （フィード購読のたびに1回。コスト規律 §13.3 は購読共有 + limit(50) 側で担保）。
-        allow read: if request.auth != null
-          && request.auth.uid in get(/databases/$(database)/documents/trips/$(tripId)).data.memberIds;
+        allow read: if isPostMember();
         // create は trip 参照を避ける（get() 課金回避）。
         // userId は本人・caption は200字以内・slotIndex は 0..8。
         // postCount<=9 / レート制限は trips の update 側に集約済み（ここには置かない）。
@@ -152,6 +157,28 @@ service cloud.firestore {
           && request.resource.data.caption.size() <= 200
           && request.resource.data.slotIndex >= 0
           && request.resource.data.slotIndex <= 8;
+        // update は「非正規化 reactionCounts のみ」をメンバーに限定許可する（toggleReaction の
+        // increment 用）。affectedKeys が reactionCounts だけ＝ userId/caption/slotIndex 等の
+        // 投稿本体フィールドの改竄を不可にする。差し替え/削除は create + Storage 掃除で行う設計のため
+        // それ以外の update/delete は引き続き暗黙 deny。
+        allow update: if isPostMember()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactionCounts']);
+
+        match /reactions/{uid} {
+          // リアクションに使える絵文字の確定集合（src/domain/types.ts REACTION_EMOJIS と一致）。
+          function isAllowedEmoji(e) {
+            return e in ['❤️', '😍', '👏', '🔥', '😂'];
+          }
+          // read はトリップメンバーのみ（自分以外の mine 解決はしないが counts 集計の整合確認に使う）。
+          allow read: if isPostMember();
+          // create/update/delete は「自分の uid のドキュメント」かつメンバーのみ（1人1リアクション制）。
+          // create/update 時は絵文字が確定集合に含まれること（不正絵文字での集計汚染を封じる）。
+          allow create, update: if isPostMember()
+            && uid == request.auth.uid
+            && isAllowedEmoji(request.resource.data.emoji);
+          allow delete: if isPostMember()
+            && uid == request.auth.uid;
+        }
       }
     }
 

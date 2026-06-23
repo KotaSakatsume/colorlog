@@ -602,6 +602,165 @@ describe('posts create / read', () => {
   });
 });
 
+describe('posts update（reactionCounts のみ限定許可）', () => {
+  async function seedTripAndPost(): Promise<void> {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(
+        doc(ctx.firestore(), 'trips/t1'),
+        tripDoc(['alice', 'bob'], {
+          alice: { displayName: 'Alice', postCount: 1 },
+          bob: { displayName: 'Bob', postCount: 0 },
+        }),
+      );
+      await setDoc(doc(ctx.firestore(), 'trips/t1/posts/p1'), {
+        userId: 'alice',
+        color: 'あか',
+        caption: 'hi',
+        thumbURL: 'https://example.com/t.jpg',
+        imageURL: 'https://example.com/i.jpg',
+        createdAt: serverTimestamp(),
+        slotIndex: 0,
+        reactionCounts: { '❤️': 1 },
+      });
+    });
+  }
+
+  // メンバーが reactionCounts のみを更新（increment 相当）するのは許可
+  it('メンバーは post の reactionCounts のみ update できる', async () => {
+    await seedTripAndPost();
+    const bob = testEnv.authenticatedContext('bob');
+    await assertSucceeds(
+      updateDoc(doc(bob.firestore(), 'trips/t1/posts/p1'), {
+        'reactionCounts.🔥': 1,
+      }),
+    );
+  });
+
+  // reactionCounts と同時に投稿本体フィールド（caption）を書き換えるのは拒否
+  it('reactionCounts に乗じて caption を書き換える update は拒否', async () => {
+    await seedTripAndPost();
+    const bob = testEnv.authenticatedContext('bob');
+    await assertFails(
+      updateDoc(doc(bob.firestore(), 'trips/t1/posts/p1'), {
+        'reactionCounts.🔥': 1,
+        caption: 'hijacked',
+      }),
+    );
+  });
+
+  // reactionCounts 以外（userId/slotIndex 等）の改竄は拒否
+  it('userId / slotIndex を書き換える update は拒否', async () => {
+    await seedTripAndPost();
+    const bob = testEnv.authenticatedContext('bob');
+    await assertFails(
+      updateDoc(doc(bob.firestore(), 'trips/t1/posts/p1'), {
+        userId: 'bob',
+        slotIndex: 5,
+      }),
+    );
+  });
+
+  // 非メンバーは reactionCounts update もできない
+  it('非メンバーは post の reactionCounts を update できない', async () => {
+    await seedTripAndPost();
+    const carol = testEnv.authenticatedContext('carol');
+    await assertFails(
+      updateDoc(doc(carol.firestore(), 'trips/t1/posts/p1'), {
+        'reactionCounts.🔥': 1,
+      }),
+    );
+  });
+});
+
+describe('reactions（自分のみ・許可絵文字・メンバー read）', () => {
+  async function seedTripAndPost(): Promise<void> {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(
+        doc(ctx.firestore(), 'trips/t1'),
+        tripDoc(['alice', 'bob'], {
+          alice: { displayName: 'Alice', postCount: 1 },
+          bob: { displayName: 'Bob', postCount: 0 },
+        }),
+      );
+      await setDoc(doc(ctx.firestore(), 'trips/t1/posts/p1'), {
+        userId: 'alice',
+        color: 'あか',
+        caption: 'hi',
+        thumbURL: 'https://example.com/t.jpg',
+        imageURL: 'https://example.com/i.jpg',
+        createdAt: serverTimestamp(),
+        slotIndex: 0,
+      });
+    });
+  }
+
+  // 自分の uid の reaction を許可絵文字で set するのは許可
+  it('自分の reaction を許可絵文字で set できる', async () => {
+    await seedTripAndPost();
+    const bob = testEnv.authenticatedContext('bob');
+    await assertSucceeds(
+      setDoc(doc(bob.firestore(), 'trips/t1/posts/p1/reactions/bob'), { emoji: '🔥' }),
+    );
+  });
+
+  // 自分の reaction を delete するのは許可（解除）
+  it('自分の reaction を delete できる', async () => {
+    await seedTripAndPost();
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'trips/t1/posts/p1/reactions/bob'), { emoji: '🔥' });
+    });
+    const bob = testEnv.authenticatedContext('bob');
+    await assertSucceeds(deleteDoc(doc(bob.firestore(), 'trips/t1/posts/p1/reactions/bob')));
+  });
+
+  // 他人の uid の reaction ドキュメントへ書くのは拒否（なりすまし防止）
+  it('他人 uid の reaction を set するのは拒否', async () => {
+    await seedTripAndPost();
+    const bob = testEnv.authenticatedContext('bob');
+    await assertFails(
+      setDoc(doc(bob.firestore(), 'trips/t1/posts/p1/reactions/alice'), { emoji: '🔥' }),
+    );
+  });
+
+  // 確定集合に無い絵文字は拒否（集計汚染防止）
+  it('不正な絵文字での reaction set は拒否', async () => {
+    await seedTripAndPost();
+    const bob = testEnv.authenticatedContext('bob');
+    await assertFails(
+      setDoc(doc(bob.firestore(), 'trips/t1/posts/p1/reactions/bob'), { emoji: '💩' }),
+    );
+  });
+
+  // 非メンバーは reaction を read できない
+  it('非メンバーは reaction を read できない', async () => {
+    await seedTripAndPost();
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'trips/t1/posts/p1/reactions/bob'), { emoji: '🔥' });
+    });
+    const carol = testEnv.authenticatedContext('carol');
+    await assertFails(getDoc(doc(carol.firestore(), 'trips/t1/posts/p1/reactions/bob')));
+  });
+
+  // メンバーは reaction を read できる
+  it('メンバーは reaction を read できる', async () => {
+    await seedTripAndPost();
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'trips/t1/posts/p1/reactions/bob'), { emoji: '🔥' });
+    });
+    const alice = testEnv.authenticatedContext('alice');
+    await assertSucceeds(getDoc(doc(alice.firestore(), 'trips/t1/posts/p1/reactions/bob')));
+  });
+
+  // 非メンバーは自分の uid でも reaction を set できない（isPostMember 不成立）
+  it('非メンバーは自分の uid でも reaction を set できない', async () => {
+    await seedTripAndPost();
+    const carol = testEnv.authenticatedContext('carol');
+    await assertFails(
+      setDoc(doc(carol.firestore(), 'trips/t1/posts/p1/reactions/carol'), { emoji: '🔥' }),
+    );
+  });
+});
+
 describe('inviteCodes read (expiresAt)', () => {
   // ケース10: 有効な inviteCode は認証済みで read できる
   it('未失効の inviteCode は認証済みで read できる', async () => {
