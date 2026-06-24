@@ -1,26 +1,41 @@
 /**
- * 画像アップロードの継ぎ目（§9-7 へのフック・§9-5 では passthrough スタブのみ）。
+ * 画像アップロードの継ぎ目（§9-7・設計 §2）。
  *
- * FirebasePostRepository に DI する境界。本Issueでは実 Storage（@react-native-firebase/storage）は
- * 書かない（設計 §6 やらないこと-1）。passthrough スタブが端末内 uri をそのまま返す＝Mock と同じ挙動。
- * 実 Storage 実装は別Issueでこの interface を満たす実装に差し替えるだけ。
+ * FirebasePostRepository に DI する境界。処理済み2サイズ（main/thumb・ローカル JPEG）と
+ * パス座標（tripId/uid/postId）を受け取り、本画像 / サムネのダウンロード URL を返す。
+ *
+ * - 実 Storage 実装は FirebasePhotoUploader（firebase-photo-uploader.ts）。
+ * - passthrough スタブは uri をそのまま返す（Mock 同等・node 完結）。Mock/テスト用に残す。
+ *
+ * storage.rules の write 条件（パス {uid} == auth.uid・image/jpeg・<1.5MiB）を満たすため、
+ * アップロード先パスを uploader が組めるよう座標を引数で受け取る（設計 §2）。
  */
 
-import type { LocalImage } from '@/repositories/types';
+import type { ProcessedImages } from '@/repositories/types';
 
-/** 昇格対象画像を本画像 / サムネ URL に解決する境界。 */
+/** アップロード先のパス座標。postId は promotePhoto 側が決定（`${uid}_${slotIndex}`）。 */
+export interface PhotoUploadTarget {
+  tripId: string;
+  uid: string;
+  postId: string;
+}
+
+/** 処理済み2サイズ（ローカル JPEG）+ パス座標を本画像 / サムネ URL に解決する境界。 */
 export interface PhotoUploader {
-  upload(input: LocalImage): Promise<{ imageURL: string; thumbURL: string }>;
+  upload(
+    images: ProcessedImages,
+    target: PhotoUploadTarget,
+  ): Promise<{ imageURL: string; thumbURL: string }>;
 }
 
 /**
- * passthrough スタブ。端末内 uri をそのまま imageURL / thumbURL に使う（Mock 同等）。
- * 実 Storage アップロードは §9-7 で本 interface の別実装に差し替える。
+ * passthrough スタブ。処理済み main/thumb の uri をそのまま imageURL / thumbURL に使う（Mock 同等）。
+ * target は無視（パスを組まない）。実 Storage アップロードは FirebasePhotoUploader が担う。
  */
 export function createPassthroughUploader(): PhotoUploader {
   return {
-    async upload(input: LocalImage) {
-      return { imageURL: input.uri, thumbURL: input.uri };
+    async upload(images: ProcessedImages) {
+      return { imageURL: images.main.uri, thumbURL: images.thumb.uri };
     },
   };
 }

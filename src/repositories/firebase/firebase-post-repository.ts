@@ -4,7 +4,8 @@
  * - subscribeToTripPosts: posts を orderBy(createdAt,'desc') + limit(50) で購読（§13 コスト規律）。
  * - promotePhoto: runTransaction で trip 検証 → slot 差し替え/追加判定 → postCount<=9 強制 →
  *   post doc 書き込み + members[uid].postCount/lastPostAt 更新を同一 tx（R4）。
- *   画像 URL は注入 PhotoUploader（本Issue passthrough）から得る（§9-7 継ぎ目）。
+ *   画像は注入 ImageProcessor で 2サイズに整え、注入 PhotoUploader（FirebasePhotoUploader）で
+ *   tx 外アップロード → 確定 URL を tx 内で書く（§5-7 順序・§9-7 継ぎ目）。
  * - reactions: reactions/{uid} に {emoji} を1人1ドキュメント、post 側に非正規化 reactionCounts。
  *   toggleReaction は runTransaction で increment + set/delete を原子的に（§13 / R4）。
  *
@@ -29,6 +30,7 @@ import {
 import { BEST_NINE_SLOTS, type Post, type ReactionSummary } from '@/domain/types';
 import { isTripOver } from '@/domain/format';
 import type {
+  ImageProcessor,
   PostRepository,
   PromotePhotoInput,
   ToggleReactionInput,
@@ -49,7 +51,10 @@ import type { PhotoUploader } from './photo-uploader';
 const POSTS_LIMIT = 50;
 
 export class FirebasePostRepository implements PostRepository {
-  constructor(private readonly uploader: PhotoUploader) {}
+  constructor(
+    private readonly uploader: PhotoUploader,
+    private readonly imageProcessor: ImageProcessor,
+  ) {}
 
   subscribeToTripPosts(tripId: string, listener: (posts: Post[]) => void): Unsubscribe {
     const q = query(
@@ -173,15 +178,25 @@ export class FirebasePostRepository implements PostRepository {
       throw new Error('キャプションは200字以内にしてください');
     }
 
-    // 画像 URL は注入 uploader から得る（本Issueは passthrough＝uri そのまま・§9-7 継ぎ目）。
-    // tx の外でアップロードし、得た URL を tx 内で書く（tx 内は I/O を最小化）。
-    const { imageURL, thumbURL } = await this.uploader.upload(localImage);
-
-    const tripRef = doc(db(), 'trips', tripId);
     // slot を決定的 post ID（${uid}_${slotIndex}）に寄せる。同 user・同 slot は必ず同一 doc に
     // 落ちるため、非トランザクショナルな getDocs(query) を使わず tx.get 1回で差し替え判定できる
     // （並行昇格でも両者が同 doc を get → 一方が後勝ちになり postCount の二重加算が起きない・should #4）。
+    // postId は Storage パス（trips/{tripId}/{uid}/{postId}/main.jpg）にも使うため、ここで先に確定する。
     const postId = `${user.uid}_${slotIndex}`;
+
+    // §5-7 順序: 画像を 2サイズに整え → tx 外で Storage へアップロード → URL 確定 → tx で書き込む。
+    // tx 内では Storage に一切触れない（tx は Firestore read→write のみ・R4）。
+    const processed = await this.imageProcessor.process(localImage);
+    // tx 失敗（旅行終了 / postCount=9 等）で Storage にファイルが残り孤児になりうるが、postId・パスとも
+    // 決定的なので同スロット再昇格時に同一パスを上書き＝次回の正常昇格で自然回収される。tx 失敗時の即時
+    // Storage 削除（ロールバック）は本Issueでは行わない（定期クリーンは §13.5 別Issue）。
+    const { imageURL, thumbURL } = await this.uploader.upload(processed, {
+      tripId,
+      uid: user.uid,
+      postId,
+    });
+
+    const tripRef = doc(db(), 'trips', tripId);
     const postRef = doc(db(), 'trips', tripId, 'posts', postId);
 
     const created = await runTransaction(db(), async (tx) => {
