@@ -22,14 +22,17 @@ import { createAsyncStorageStore } from '@/repositories/storage';
 import type { Repositories } from '@/repositories/types';
 
 import { FirebaseAuthService } from './firebase-auth-service';
+import { FirebasePhotoUploader } from './firebase-photo-uploader';
 import { FirebasePostRepository } from './firebase-post-repository';
 import { FirebaseTripRepository } from './firebase-trip-repository';
-import { createPassthroughUploader } from './photo-uploader';
 
 /** Firebase 実装一式を組み立てて返す。Dev Build でのみ呼ばれる（context.tsx の動的 require 経由）。 */
 export function createFirebaseRepositories(): Repositories {
+  // ImageProcessor は posts（promotePhoto で process を呼ぶ）と束フィールド（UI 用）の両方で同一インスタンスを共有。
+  const imageProcessor = new ExpoImageProcessor();
   // posts は uploadQueue へ注入するため先に const 化（mock/index.ts と同手順）。
-  const posts = new FirebasePostRepository(createPassthroughUploader());
+  // uploader を実 Storage 実装（FirebasePhotoUploader）に差し替え、ImageProcessor を constructor 注入（設計 §5）。
+  const posts = new FirebasePostRepository(new FirebasePhotoUploader(), imageProcessor);
   const uploadQueue = new MockUploadQueue({
     promotePhoto: (input) => posts.promotePhoto(input),
     store: createAsyncStorageStore(),
@@ -39,6 +42,6 @@ export function createFirebaseRepositories(): Repositories {
     trips: new FirebaseTripRepository(),
     posts,
     uploadQueue,
-    imageProcessor: new ExpoImageProcessor(),
+    imageProcessor,
   };
 }

@@ -8,8 +8,11 @@ rules_version = '2';
 // しか配られないため、URL を知らない非メンバーは実質到達できない（厳格 read は別Issue）。
 service firebase.storage {
   match /b/{bucket}/o {
-    // trips/{tripId}/{uid}/{postId}: 投稿画像。
-    match /trips/{tripId}/{uid}/{postId} {
+    // trips/{tripId}/{uid}/{postId}/{fileName}: 投稿画像（main.jpg / thumb.jpg）。
+    // アップロード先は trips/{tripId}/{uid}/{postId}/main.jpg（5セグメント）になるため、
+    // {fileName} を1セグメント追加して受ける（v2 ワイルドカードは1セグメントのみマッチ）。
+    // {uid} は3番目のままなので本人チェック・size・contentType 条件はそのまま機能する。
+    match /trips/{tripId}/{uid}/{postId}/{fileName} {
       allow read: if request.auth != null;
       // write は本人パス（{uid} == auth.uid）・1.5MiB 未満・image/jpeg のみ。
       allow write: if request.auth != null
