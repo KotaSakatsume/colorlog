@@ -86,6 +86,9 @@ export class FirebaseAuthService implements AuthService {
     const displayName = patch.displayName?.trim();
     if (displayName) next.displayName = displayName;
     if ('photoURL' in patch) next.photoURL = patch.photoURL || undefined;
+    // avatarConfig は Firebase Auth profile に乗らない（users ドキュメント行き＝follow-up）。
+    // 今回は in-memory にだけ保持し、subscribe 経由で当人の画面へ即反映する（型整合・実保存は将来）。
+    if ('avatarConfig' in patch) next.avatarConfig = patch.avatarConfig;
 
     // interface は同期 void。Firebase への反映は fire-and-forget（Mock と同契約）。
     if (fbUser) {

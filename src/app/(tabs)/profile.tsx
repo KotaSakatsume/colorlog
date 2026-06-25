@@ -41,6 +41,7 @@ export default function ProfileScreen() {
               photoURL={user.photoURL ?? undefined}
               size={88}
               fallbackName={user.displayName}
+              config={user.avatarConfig}
             />
             <ThemedText type="subtitle">{user.displayName}</ThemedText>
             <ThemedText type="small" themeColor="textSecondary">
@@ -49,6 +50,12 @@ export default function ProfileScreen() {
             <UIButton
               title="プロフィールを編集"
               onPress={() => router.push('/profile/edit')}
+              style={styles.editBtn}
+            />
+            <UIButton
+              title="アバターを編集"
+              variant="secondary"
+              onPress={() => router.push('/profile/avatar')}
               style={styles.editBtn}
             />
             {user.isAnonymous ? (

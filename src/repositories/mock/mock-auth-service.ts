@@ -36,6 +36,10 @@ export class MockAuthService implements AuthService {
     if ('photoURL' in patch) {
       next.photoURL = patch.photoURL || undefined;
     }
+    // avatarConfig はキーが渡された時だけ反映（`{}` や undefined で seed 既定へリセット可能）。
+    if ('avatarConfig' in patch) {
+      next.avatarConfig = patch.avatarConfig;
+    }
     this.user = next;
     this.listeners.forEach((fn) => fn(this.user));
   }
