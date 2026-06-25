@@ -18,6 +18,7 @@ export default function RootLayout() {
             <Stack screenOptions={{ headerBackButtonDisplayMode: 'minimal' }}>
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
               <Stack.Screen name="profile/edit" options={{ title: 'プロフィール編集', presentation: 'modal' }} />
+              <Stack.Screen name="profile/avatar" options={{ title: 'アバターを編集' }} />
               <Stack.Screen name="trip/create" options={{ title: 'トリップ作成', presentation: 'modal' }} />
               <Stack.Screen name="trip/join" options={{ title: '参加', presentation: 'modal' }} />
               <Stack.Screen name="trip/[id]/index" options={{ title: '' }} />

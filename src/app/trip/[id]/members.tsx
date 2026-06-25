@@ -42,6 +42,7 @@ export default function MembersScreen() {
                 color={member.color}
                 size={36}
                 fallbackName={member.displayName}
+                config={isMe ? me.avatarConfig : undefined}
               />
               <View style={styles.info}>
                 <ThemedText type="smallBold">

@@ -5,6 +5,7 @@
  * Mock 実装と Firebase 実装を差し替え可能にするための境界。
  */
 
+import type { AvatarConfig } from '@/domain/avatar';
 import type {
   InviteCode,
   Post,
@@ -24,6 +25,8 @@ export type AuthUser = {
   photoURL?: string;
   /** 匿名ユーザーか。Apple 連携後は false。Mock では初期 true。 */
   isAnonymous: boolean;
+  /** ユーザーが選んだアバターの見た目。未設定なら seed 既定（後方互換）。 */
+  avatarConfig?: AvatarConfig;
 };
 
 /** 端末内の撮影候補（クラウド外。ベスト9へ昇格した瞬間だけアップロードされる）。 */
@@ -91,7 +94,7 @@ export type ToggleReactionInput = {
 };
 
 /** プロフィール更新で変更できる項目。 */
-export type ProfileUpdate = Partial<Pick<AuthUser, 'displayName' | 'photoURL'>>;
+export type ProfileUpdate = Partial<Pick<AuthUser, 'displayName' | 'photoURL' | 'avatarConfig'>>;
 
 /** 認証サービス（この段階では Mock の固定ユーザーのみ） */
 export interface AuthService {

@@ -18,7 +18,7 @@ import { SvgXml } from 'react-native-svg';
 
 import { ThemedText } from '@/components/themed-text';
 import { Tint } from '@/constants/theme';
-import { buildMemberAvatarSvg } from '@/domain/avatar';
+import { buildMemberAvatarSvg, type AvatarConfig } from '@/domain/avatar';
 import { contrastTextColor, type AssignedColor } from '@/domain/colors';
 import { useThemeScheme } from '@/hooks/use-color-scheme';
 import { useTheme } from '@/hooks/use-theme';
@@ -34,19 +34,21 @@ type Props = {
   photoURL?: string;
   /** フォールバック頭文字の元になる表示名（無ければ userId）。 */
   fallbackName?: string;
+  /** ユーザーが選んだ見た目。省略時は seed 既定（既存呼び出しは無変更で従来挙動）。 */
+  config?: AvatarConfig;
   style?: ViewStyle;
 };
 
 /** 配布色に染まる Humation アバター。失敗時は頭文字 / 色 swatch に縮退する。 */
-export function MemberAvatar({ userId, color, size, photoURL, fallbackName, style }: Props) {
+export function MemberAvatar({ userId, color, size, photoURL, fallbackName, config, style }: Props) {
   const theme = useTheme();
   const scheme = useThemeScheme();
   // SvgXml の onError で描画失敗を検知したら頭文字フォールバックへ切り替える。
   const [svgFailed, setSvgFailed] = useState(false);
 
   const svg = useMemo(
-    () => (photoURL ? null : buildMemberAvatarSvg({ userId, colorHex: color?.hex })),
-    [photoURL, userId, color?.hex],
+    () => (photoURL ? null : buildMemberAvatarSvg({ userId, colorHex: color?.hex, config })),
+    [photoURL, userId, color?.hex, config],
   );
 
   const dimension = { width: size, height: size, borderRadius: size / 2 };

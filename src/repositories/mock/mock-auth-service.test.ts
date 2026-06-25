@@ -78,6 +78,37 @@ describe('MockAuthService', () => {
     expect(received[1].displayName).toBe('はなこ');
   });
 
+  it('updateProfile は avatarConfig を保存し購読者へ通知する（Issue #25）', () => {
+    const auth = new MockAuthService();
+    const received: AuthUser[] = [];
+    auth.subscribe((u) => received.push(u));
+
+    const config = { selections: { head: 'hm1-p-000005' }, colors: { hair: '#FF0000' } };
+    auth.updateProfile({ avatarConfig: config });
+
+    expect(auth.getCurrentUser().avatarConfig).toEqual(config);
+    // 初期通知 + 更新通知。
+    expect(received).toHaveLength(2);
+    expect(received[1].avatarConfig).toEqual(config);
+  });
+
+  it('avatarConfig 更新は displayName など他フィールドを壊さない（部分更新）', () => {
+    const auth = new MockAuthService();
+    auth.updateProfile({ displayName: 'みき' });
+    auth.updateProfile({ avatarConfig: { colors: { skin: '#FFCC99' } } });
+
+    expect(auth.getCurrentUser().displayName).toBe('みき');
+    expect(auth.getCurrentUser().avatarConfig).toEqual({ colors: { skin: '#FFCC99' } });
+  });
+
+  it('avatarConfig に {} を渡すと既定へリセットできる', () => {
+    const auth = new MockAuthService();
+    auth.updateProfile({ avatarConfig: { colors: { hair: '#FF0000' } } });
+    auth.updateProfile({ avatarConfig: {} });
+
+    expect(auth.getCurrentUser().avatarConfig).toEqual({});
+  });
+
   it('subscribe は登録直後に現在値を即時通知し、unsubscribe 後は通知しない', () => {
     const auth = new MockAuthService();
     const received: AuthUser[] = [];

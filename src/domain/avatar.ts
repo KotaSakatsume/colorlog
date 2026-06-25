@@ -15,8 +15,58 @@
  *    残ると造形が黒/白に化ける。よって最終出力の `var(--hm-*, #hex)` を fallback hex
  *    に正規表現で置換し、SVG に `var(` を一切残さない。
  */
-import { createAvatar } from '@humation/core';
+import { createAvatar, createPartPreview, getPartsForSlot } from '@humation/core';
 import { humation1 } from '@humation/assets-humation-1';
+
+// ID 型は @humation/core では素の string エイリアス（brand ではない）。
+// domain でのみ humation を import する制約を守るため、画面/型へ漏らすときは
+// ここから re-export して使う（Investigator §1-3）。
+export type { SelectionSlotId, PartOptionId, ColorSlotId } from '@humation/core';
+import type { SelectionSlotId, PartOptionId, ColorSlotId } from '@humation/core';
+
+/**
+ * ユーザーが選んだアバターの見た目（全 optional・部分上書き）。
+ *
+ * - `selections`: 造形スロット→パーツ。未指定スロットは seed 由来のデフォルトに委ねる。
+ * - `colors`: 色スロット→hex。未指定は createAvatar 既定（manifest default）。
+ * - `background`: 背景。未指定なら従来どおり配布色 / DEFAULT_BACKGROUND を使う。
+ *
+ * `{}` や `undefined` は完全に従来挙動と等価（後方互換の核）。ID 型は素 string
+ * なのでコンパイラでキーを縛れない。UI 側は下記 `AVATAR_*_SLOTS` 定数を回して
+ * 不正キーの混入を実行時に防ぐ（Investigator §1-1 / リスク2）。
+ */
+export type AvatarConfig = {
+  selections?: Partial<Record<SelectionSlotId, PartOptionId>>;
+  colors?: Partial<Record<ColorSlotId, string>>;
+  background?: string;
+};
+
+/**
+ * UI に並べる造形スロット（manifest.selectionSlots 順）。
+ * 画面が @humation を import せずスロットを駆動するための domain 定数。
+ * `bottom` は selection / color 両空間に存在する（別物）ので、色スロットの
+ * `AVATAR_COLOR_SLOTS` とは混同しないこと（Investigator §3-2）。
+ */
+export const AVATAR_SELECTION_SLOTS: readonly { id: SelectionSlotId; label: string }[] = [
+  { id: 'bottom', label: 'ボトム' },
+  { id: 'body', label: 'からだ' },
+  { id: 'head', label: 'あたま' },
+  { id: 'item', label: 'アイテム' },
+  { id: 'glasses', label: 'メガネ' },
+] as const;
+
+/**
+ * UI に並べる色スロット（hair/skin/clothes/stroke/bottom の 5 つ）。
+ * `background` は色スロットとして manifest に存在するが、背景は createAvatar の
+ * `background` オプションで別経路管理するため、ここには含めない（既存挙動と整合）。
+ */
+export const AVATAR_COLOR_SLOTS: readonly { id: ColorSlotId; label: string }[] = [
+  { id: 'hair', label: '髪' },
+  { id: 'skin', label: '肌' },
+  { id: 'clothes', label: '服' },
+  { id: 'stroke', label: '線' },
+  { id: 'bottom', label: 'ボトム色' },
+] as const;
 
 /**
  * `var(--hm-KEY, #HEX)` を fallback hex（または `colors` で上書きされた実 hex）に潰す。
@@ -29,11 +79,34 @@ import { humation1 } from '@humation/assets-humation-1';
  */
 const HM_VAR_PATTERN = /var\(\s*--hm-[\w-]+\s*,\s*(#[0-9a-fA-F]{3,8})\s*\)/g;
 
+/**
+ * 部分マップ（`Partial<Record<K, V>>`）を humation の `Record<K, V>` 引数へ橋渡しする。
+ *
+ * `AvatarConfig` は全 optional のため値型が `V | undefined` になり、humation の
+ * `CreateAvatarOptions.selections/colors`（非 Partial の `Record`）へ直接渡すと
+ * strict 下で代入不能になる。humation 実装は部分マップ・undefined 値を無害に扱う
+ * （未指定スロットは seed/manifest 既定で補完）ため、undefined エントリを除いた
+ * `Record` に整形して境界の型を合わせる。
+ */
+function toHumationRecord(
+  map: Partial<Record<string, string>> | undefined,
+): Record<string, string> | undefined {
+  if (!map) return undefined;
+  const out: Record<string, string> = {};
+  for (const key of Object.keys(map)) {
+    const value = map[key];
+    if (value !== undefined) out[key] = value;
+  }
+  return out;
+}
+
 export type BuildMemberAvatarSvgInput = {
   /** 決定的シード。同一 userId → 同一造形（fnv1a）。 */
   userId: string;
   /** メンバー配布色 hex（#RRGGBB）。背景に焼き込む。未配布なら省略。 */
   colorHex?: string;
+  /** ユーザーが選んだ見た目（selections/colors/background）。省略時は seed 既定。 */
+  config?: AvatarConfig;
 };
 
 /** 未配布（colorHex 省略）時に背景へ当てる無彩のデフォルト。 */
@@ -55,12 +128,90 @@ export function bakeColorVars(svg: string): string {
  */
 export function buildMemberAvatarSvg(input: BuildMemberAvatarSvgInput): string | null {
   try {
-    const background = input.colorHex ?? DEFAULT_BACKGROUND;
+    const { config } = input;
+    // 背景の優先順位: config.background > 配布色 > 無彩デフォルト。
+    // selections/colors を渡しても未指定スロットは createAvatar が seed/manifest で補完する。
+    const background = config?.background ?? input.colorHex ?? DEFAULT_BACKGROUND;
     const avatar = createAvatar(humation1, {
       seed: input.userId,
       background,
+      selections: toHumationRecord(config?.selections),
+      colors: toHumationRecord(config?.colors),
     });
     return bakeColorVars(avatar.toString());
+  } catch {
+    return null;
+  }
+}
+
+/** ピッカー用パーツ。`previewSvg` は var( 焼き込み済み（SvgXml にそのまま渡せる）。 */
+export type AvatarPart = {
+  id: PartOptionId;
+  /** ラベル（manifest の part.name。グリッドの a11y / キャプション用）。 */
+  name: string;
+  previewSvg: string;
+};
+
+/** ピッカー用プレビュー生成オプション（色を当てたサムネを出すため）。 */
+export type AvatarPreviewOptions = {
+  colors?: Partial<Record<ColorSlotId, string>>;
+  background?: string;
+};
+
+/**
+ * 造形スロットの選択肢を列挙し、各パーツのサムネ SVG（var( 焼き込み済み）を返す。
+ *
+ * `createPartPreview` の出力は `var(--hm-*, #hex)` を含む（Investigator §2-1）ので
+ * 必ず `bakeColorVars` を通す（react-native-svg は var() を解決せず黒/白化けする）。
+ * 不正 slot で `getPartsForSlot` が空配列を返すケースは自然に空配列になる。
+ * 個別パーツの生成失敗（未知 id 等）は握って当該パーツだけ除外する。
+ */
+export function listPartsForSlot(
+  slot: SelectionSlotId,
+  opts?: AvatarPreviewOptions,
+): AvatarPart[] {
+  let parts;
+  try {
+    parts = getPartsForSlot(humation1, slot);
+  } catch {
+    return [];
+  }
+  const result: AvatarPart[] = [];
+  for (const part of parts) {
+    try {
+      const preview = createPartPreview(humation1, part, {
+        colors: toHumationRecord(opts?.colors),
+        background: opts?.background,
+      });
+      result.push({
+        id: part.id,
+        name: part.name ?? part.id,
+        previewSvg: bakeColorVars(preview.toString()),
+      });
+    } catch {
+      // 単一パーツの描画失敗はサイレントに除外（リスト全体は壊さない）。
+    }
+  }
+  return result;
+}
+
+/**
+ * 単一パーツのプレビュー SVG（var( 焼き込み済み）。リスト外の単発描画用。
+ * 未知 part id 等で `createPartPreview` が throw した場合は `null` を返す。
+ */
+export function buildPartPreviewSvg(
+  slot: SelectionSlotId,
+  partId: PartOptionId,
+  opts?: AvatarPreviewOptions,
+): string | null {
+  // slot は createPartPreview の引数ではないが、API の対称性と将来の検証余地のため受ける。
+  void slot;
+  try {
+    const preview = createPartPreview(humation1, partId, {
+      colors: toHumationRecord(opts?.colors),
+      background: opts?.background,
+    });
+    return bakeColorVars(preview.toString());
   } catch {
     return null;
   }
