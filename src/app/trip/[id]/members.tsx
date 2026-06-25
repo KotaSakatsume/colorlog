@@ -2,6 +2,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { ColorChip } from '@/components/color-chip';
+import { MemberAvatar } from '@/components/member-avatar';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
@@ -36,11 +37,11 @@ export default function MembersScreen() {
             <View
               key={uid}
               style={[styles.row, { backgroundColor: theme.backgroundElement }]}>
-              <View
-                style={[
-                  styles.swatch,
-                  { backgroundColor: member.color?.hex ?? theme.backgroundSelected },
-                ]}
+              <MemberAvatar
+                userId={uid}
+                color={member.color}
+                size={36}
+                fallbackName={member.displayName}
               />
               <View style={styles.info}>
                 <ThemedText type="smallBold">
@@ -77,6 +78,5 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 14,
   },
-  swatch: { width: 36, height: 36, borderRadius: 18 },
   info: { flex: 1, gap: 2 },
 });
