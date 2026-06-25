@@ -189,11 +189,11 @@ describe('listPartsForSlot / buildPartPreviewSvg（ピッカー・Issue #25）',
     expect(buildPartPreviewSvg('head', 'no-such-part-xxx')).toBeNull();
   });
 
-  it('スロット定数は selection/color で別空間（bottom の取り違え防止）', () => {
+  it('bottom は表示に映らないため selection/color の編集 UI 双方から除外', () => {
     const selIds = AVATAR_SELECTION_SLOTS.map((s) => s.id);
     const colorIds = AVATAR_COLOR_SLOTS.map((s) => s.id);
-    expect(selIds).toContain('bottom');
-    expect(colorIds).toContain('bottom');
+    expect(selIds).not.toContain('bottom');
+    expect(colorIds).not.toContain('bottom');
     // background は色オプションで別管理するため color スロット一覧に含めない。
     expect(colorIds).not.toContain('background');
   });

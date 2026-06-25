@@ -44,11 +44,10 @@ export type AvatarConfig = {
 /**
  * UI に並べる造形スロット（manifest.selectionSlots 順）。
  * 画面が @humation を import せずスロットを駆動するための domain 定数。
- * `bottom` は selection / color 両空間に存在する（別物）ので、色スロットの
- * `AVATAR_COLOR_SLOTS` とは混同しないこと（Investigator §3-2）。
+ * `bottom`（造形・色とも）は表示上映らないため編集 UI からは除外している。
+ * 未指定スロットは createAvatar が seed/manifest 既定で補完する。
  */
 export const AVATAR_SELECTION_SLOTS: readonly { id: SelectionSlotId; label: string }[] = [
-  { id: 'bottom', label: 'ボトム' },
   { id: 'body', label: 'からだ' },
   { id: 'head', label: 'あたま' },
   { id: 'item', label: 'アイテム' },
@@ -56,16 +55,16 @@ export const AVATAR_SELECTION_SLOTS: readonly { id: SelectionSlotId; label: stri
 ] as const;
 
 /**
- * UI に並べる色スロット（hair/skin/clothes/stroke/bottom の 5 つ）。
+ * UI に並べる色スロット（hair/skin/clothes/stroke の 4 つ）。
  * `background` は色スロットとして manifest に存在するが、背景は createAvatar の
  * `background` オプションで別経路管理するため、ここには含めない（既存挙動と整合）。
+ * `bottom`（ボトム色）は表示上映らないため編集 UI からは除外している。
  */
 export const AVATAR_COLOR_SLOTS: readonly { id: ColorSlotId; label: string }[] = [
   { id: 'hair', label: '髪' },
   { id: 'skin', label: '肌' },
   { id: 'clothes', label: '服' },
   { id: 'stroke', label: '線' },
-  { id: 'bottom', label: 'ボトム色' },
 ] as const;
 
 /**
