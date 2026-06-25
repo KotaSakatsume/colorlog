@@ -1,24 +1,22 @@
-import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ColorChip } from '@/components/color-chip';
+import { MemberAvatar } from '@/components/member-avatar';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { UIButton } from '@/components/ui-button';
-import { BottomTabInset, Spacing, Tint } from '@/constants/theme';
+import { BottomTabInset, Spacing } from '@/constants/theme';
 import { COLOR_POOL } from '@/domain/colors';
 import { useCurrentUser, useRepositories } from '@/repositories/context';
-import { useThemeScheme } from '@/hooks/use-color-scheme';
 import { useUserTrips } from '@/hooks/use-trips';
 
 export default function ProfileScreen() {
   const user = useCurrentUser();
   const { trips } = useUserTrips();
   const { auth } = useRepositories();
-  const scheme = useThemeScheme();
   const [linking, setLinking] = useState(false);
 
   // 匿名ユーザーを Apple アカウントへ連携させる。状態は useCurrentUser の購読で再描画される。
@@ -38,15 +36,12 @@ export default function ProfileScreen() {
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
         <ScrollView contentContainerStyle={styles.content}>
           <View style={styles.profileHeader}>
-            {user.photoURL ? (
-              <Image source={{ uri: user.photoURL }} style={styles.avatar} contentFit="cover" />
-            ) : (
-              <View style={[styles.avatar, { backgroundColor: Tint[scheme].tint }]}>
-                <ThemedText type="title" style={styles.avatarText}>
-                  {user.displayName.slice(0, 1)}
-                </ThemedText>
-              </View>
-            )}
+            <MemberAvatar
+              userId={user.uid}
+              photoURL={user.photoURL ?? undefined}
+              size={88}
+              fallbackName={user.displayName}
+            />
             <ThemedText type="subtitle">{user.displayName}</ThemedText>
             <ThemedText type="small" themeColor="textSecondary">
               参加中・過去のトリップ {trips.length} 件
@@ -101,14 +96,6 @@ const styles = StyleSheet.create({
   editBtn: { marginTop: Spacing.two, alignSelf: 'stretch' },
   accountStatus: { marginTop: Spacing.two },
   linkBtn: { marginTop: Spacing.one, alignSelf: 'stretch' },
-  avatar: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: { color: '#FFFFFF', fontSize: 40 },
   sectionTitle: { marginTop: Spacing.three, fontSize: 16 },
   sectionDesc: { marginBottom: Spacing.two },
   palette: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },

@@ -4,6 +4,8 @@
   "version": "1.0.0",
   "dependencies": {
     "@expo/ui": "~0.2.0-beta.9",
+    "@humation/assets-humation-1": "^1.0.1",
+    "@humation/core": "^1.0.1",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-firebase/app": "^24.1.1",
     "@react-native-firebase/auth": "^24.1.1",
