@@ -86,19 +86,21 @@ export default function EditAvatarScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.previewSection}>
-          <MemberAvatar
-            userId={user.uid}
-            size={PREVIEW_SIZE}
-            fallbackName={user.displayName}
-            config={draft}
-          />
-          <ThemedText type="small" themeColor="textSecondary">
-            選んだ見た目はすぐにプレビューへ反映されます。
-          </ThemedText>
-        </View>
+      {/* プレビューは固定ヘッダー。色やパーツを選ぶため下へスクロールしても
+          アバターが画面外に消えず、変更を常に直接確認できる（UX 改善）。 */}
+      <View style={[styles.previewHeader, { borderBottomColor: theme.backgroundSelected }]}>
+        <MemberAvatar
+          userId={user.uid}
+          size={PREVIEW_SIZE}
+          fallbackName={user.displayName}
+          config={draft}
+        />
+        <ThemedText type="small" themeColor="textSecondary">
+          選んだ見た目はすぐにプレビューへ反映されます。
+        </ThemedText>
+      </View>
 
+      <ScrollView contentContainerStyle={styles.content}>
         <ThemedText type="smallBold" style={styles.sectionTitle}>
           パーツ
         </ThemedText>
@@ -196,7 +198,15 @@ export default function EditAvatarScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { padding: Spacing.three, gap: Spacing.two },
-  previewSection: { alignItems: 'center', gap: Spacing.two, paddingVertical: Spacing.three },
+  // 固定ヘッダー（スクロールしない）。下端の区切り線で操作部と分ける。
+  previewHeader: {
+    alignItems: 'center',
+    gap: Spacing.two,
+    paddingHorizontal: Spacing.three,
+    paddingTop: Spacing.three,
+    paddingBottom: Spacing.two,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
   sectionTitle: { marginTop: Spacing.three, fontSize: 16 },
   slotTabs: { gap: Spacing.two, paddingVertical: Spacing.one },
   slotTab: {
