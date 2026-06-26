@@ -147,6 +147,31 @@ describe('buildMemberAvatarSvg（config 拡張・Issue #25）', () => {
       }),
     ).not.toThrow();
   });
+
+  it('UI から外した bottom 値も config 経由なら生成に反映される（後方互換の核・Issue #27）', () => {
+    // bottom は編集 UI（AVATAR_*_SLOTS）から除外したが、既存ユーザーの avatarConfig に
+    // 保存済みの bottom 選択/色は buildMemberAvatarSvg に渡り続けねばならない。定数から
+    // bottom が消えたことで「未使用キー」と誤認し toHumationRecord 等で弾く最適化が将来
+    // 入るとサイレントに後方互換が壊れるため、ここで反映を固定する。
+    const base = buildMemberAvatarSvg({ userId: 'compat-bottom' });
+    const withBottomColor = buildMemberAvatarSvg({
+      userId: 'compat-bottom',
+      config: { colors: { bottom: '#FF00AA' } },
+    });
+    expect(withBottomColor).not.toBeNull();
+    // 保存済みボトム色が最終 SVG に焼き込まれる（表示上は見えなくても生成には載る）。
+    expect((withBottomColor as string).toUpperCase()).toContain('#FF00AA');
+    expect(withBottomColor).not.toBe(base);
+    // 造形側（selections.bottom）も同様に反映される。
+    const bottomParts = listPartsForSlot('bottom');
+    const altBottom = bottomParts.find((p) => !(base as string).includes(p.id)) ?? bottomParts[0];
+    const withBottomSelection = buildMemberAvatarSvg({
+      userId: 'compat-bottom',
+      config: { selections: { bottom: altBottom.id } },
+    });
+    expect(withBottomSelection).not.toBeNull();
+    expect(withBottomSelection).not.toBe(base);
+  });
 });
 
 describe('listPartsForSlot / buildPartPreviewSvg（ピッカー・Issue #25）', () => {
@@ -189,11 +214,11 @@ describe('listPartsForSlot / buildPartPreviewSvg（ピッカー・Issue #25）',
     expect(buildPartPreviewSvg('head', 'no-such-part-xxx')).toBeNull();
   });
 
-  it('スロット定数は selection/color で別空間（bottom の取り違え防止）', () => {
+  it('bottom は表示に映らないため selection/color の編集 UI 双方から除外', () => {
     const selIds = AVATAR_SELECTION_SLOTS.map((s) => s.id);
     const colorIds = AVATAR_COLOR_SLOTS.map((s) => s.id);
-    expect(selIds).toContain('bottom');
-    expect(colorIds).toContain('bottom');
+    expect(selIds).not.toContain('bottom');
+    expect(colorIds).not.toContain('bottom');
     // background は色オプションで別管理するため color スロット一覧に含めない。
     expect(colorIds).not.toContain('background');
   });
@@ -206,7 +231,7 @@ describe('bakeColorVars', () => {
   });
 
   it('var( を含まない文字列はそのまま返す（root style 誤爆なし）', () => {
-    const input = '<svg style="--hm-bottom:#000000;--hm-clothes:#FFFFFF;">';
+    const input = '<svg style="--hm-clothes:#000000;--hm-skin:#FFFFFF;">';
     expect(bakeColorVars(input)).toBe(input);
   });
 
