@@ -115,6 +115,99 @@ export type BuildMemberAvatarSvgInput = {
 /** 未配布（colorHex 省略）時に背景へ当てる無彩のデフォルト。 */
 const DEFAULT_BACKGROUND = '#E9E8E6';
 
+/** `<style>...</style>` 要素（root の `style="..."` 属性ではなく要素）。 */
+const HM_STYLE_BLOCK_PATTERN = /<style\b[^>]*>([\s\S]*?)<\/style>/gi;
+/** CSS ルール `selector(s) { decls }`。selector はカンマ区切り複数可。 */
+const HM_CSS_RULE_PATTERN = /([^{}]+)\{([^}]*)\}/g;
+/** 単純クラスセレクタ `.stN` のみ対象（複合・子孫セレクタは扱わない）。 */
+const HM_SIMPLE_CLASS_SELECTOR = /^\.([\w-]+)$/;
+/** class 付きの図形要素（葉のみ。group へ塗りを撒かない）。 */
+const HM_SHAPE_WITH_CLASS_PATTERN =
+  /<(path|polygon|polyline|circle|ellipse|rect|line)\b([^>]*?)(\/?)>/gi;
+/** react-native-svg が属性として解釈できる presentation プロパティのみ注入する。 */
+const HM_PRESENTATION_PROPS = new Set([
+  'fill',
+  'fill-opacity',
+  'fill-rule',
+  'stroke',
+  'stroke-width',
+  'stroke-linecap',
+  'stroke-linejoin',
+  'stroke-miterlimit',
+  'stroke-dasharray',
+  'stroke-dashoffset',
+  'stroke-opacity',
+  'opacity',
+  'clip-rule',
+]);
+
+/** `prop: value;` 列を {prop: value} へ。px は SVG ユーザー単位に正規化（`1.47px`→`1.47`）。 */
+function parseStyleDeclarations(body: string): Record<string, string> {
+  const decls: Record<string, string> = {};
+  for (const chunk of body.split(';')) {
+    const idx = chunk.indexOf(':');
+    if (idx < 0) continue;
+    const prop = chunk.slice(0, idx).trim().toLowerCase();
+    const value = chunk.slice(idx + 1).trim().replace(/(\d)px\b/g, '$1');
+    if (prop && value) decls[prop] = value;
+  }
+  return decls;
+}
+
+/**
+ * `<style>.stN{fill:#...}</style>` + `class="stN"` で塗りを与える Illustrator 書き出し
+ * SVG を、各図形のインライン presentation 属性へ畳む。
+ *
+ * react-native-svg は `<style>` の CSS クラスセレクタを解決しないため、未処理だと
+ * class 塗りが無視され全パスが既定の黒 ＝「シルエットだけ」に化ける（humation の item
+ * スロット一部 hm1-p-000070〜 がこの形式）。bakeColorVars と同じく「react-native-svg の
+ * CSS 非対応」を domain 層の文字列処理で吸収する。
+ *
+ * 手順: (1) `<style>` から `.class { prop:val }`（カンマ区切り複数セレクタ可）を集約
+ * （ソース順で後勝ち＝CSS カスケード）、(2) `<style>` 要素を除去、(3) class を持つ図形へ
+ * presentation 属性として注入（既存のインライン属性は尊重し上書きしない）。宣言値の
+ * `var(--hm-*)` はそのまま残し、後段の bakeColorVars が実値へ解決する。
+ */
+export function inlineStyleClasses(svg: string): string {
+  if (!svg.includes('<style')) return svg;
+  const classDecls = new Map<string, Record<string, string>>();
+  for (const block of svg.matchAll(HM_STYLE_BLOCK_PATTERN)) {
+    for (const rule of block[1].matchAll(HM_CSS_RULE_PATTERN)) {
+      const decls = parseStyleDeclarations(rule[2]);
+      if (Object.keys(decls).length === 0) continue;
+      for (const selector of rule[1].split(',')) {
+        const match = selector.trim().match(HM_SIMPLE_CLASS_SELECTOR);
+        if (!match) continue;
+        const merged = classDecls.get(match[1]) ?? {};
+        Object.assign(merged, decls);
+        classDecls.set(match[1], merged);
+      }
+    }
+  }
+  const stripped = svg.replace(HM_STYLE_BLOCK_PATTERN, '');
+  if (classDecls.size === 0) return stripped;
+  return stripped.replace(
+    HM_SHAPE_WITH_CLASS_PATTERN,
+    (full, tag: string, attrs: string, selfClose: string) => {
+      const classMatch = attrs.match(/\bclass="([^"]*)"/);
+      if (!classMatch) return full;
+      const merged: Record<string, string> = {};
+      for (const name of classMatch[1].trim().split(/\s+/)) {
+        const decls = classDecls.get(name);
+        if (decls) Object.assign(merged, decls);
+      }
+      let inject = '';
+      for (const [prop, value] of Object.entries(merged)) {
+        if (!HM_PRESENTATION_PROPS.has(prop)) continue;
+        // 既存のインライン属性は尊重（CSS の class より要素属性を優先側に倒し安全側）。
+        if (new RegExp(`(?:^|\\s)${prop}=`).test(attrs)) continue;
+        inject += ` ${prop}="${value}"`;
+      }
+      return `<${tag}${attrs}${inject}${selfClose}>`;
+    },
+  );
+}
+
 /**
  * SVG 文字列内の `var(--hm-KEY, #hex)` を実値へ畳む（react-native-svg は CSS custom
  * property を解決しない罠＝リスク#1 への後段処理）。
@@ -154,7 +247,9 @@ export function buildMemberAvatarSvg(input: BuildMemberAvatarSvgInput): string |
       selections: toHumationRecord(config?.selections),
       colors: toHumationRecord(config?.colors),
     });
-    return bakeColorVars(avatar.toString());
+    // <style> クラス塗りをインライン化してから var( を畳む（順序重要：クラス値の
+    // var(--hm-*) も属性化された後に bakeColorVars が実値へ解決する）。
+    return bakeColorVars(inlineStyleClasses(avatar.toString()));
   } catch {
     return null;
   }
@@ -202,7 +297,7 @@ export function listPartsForSlot(
       result.push({
         id: part.id,
         name: part.name ?? part.id,
-        previewSvg: bakeColorVars(preview.toString()),
+        previewSvg: bakeColorVars(inlineStyleClasses(preview.toString())),
       });
     } catch {
       // 単一パーツの描画失敗はサイレントに除外（リスト全体は壊さない）。
@@ -227,7 +322,7 @@ export function buildPartPreviewSvg(
       colors: toHumationRecord(opts?.colors),
       background: opts?.background,
     });
-    return bakeColorVars(preview.toString());
+    return bakeColorVars(inlineStyleClasses(preview.toString()));
   } catch {
     return null;
   }

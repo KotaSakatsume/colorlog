@@ -11,8 +11,16 @@ import {
   bakeColorVars,
   buildMemberAvatarSvg,
   buildPartPreviewSvg,
+  inlineStyleClasses,
   listPartsForSlot,
 } from './avatar';
+
+/** SVG 文字列から fill/stroke 属性に現れる実 hex 色を集める（none は除外）。 */
+function fillStrokeHexes(svg: string): string[] {
+  const out = new Set<string>();
+  for (const m of svg.matchAll(/(?:fill|stroke)="(#[0-9a-fA-F]{3,8})"/g)) out.add(m[1].toLowerCase());
+  return [...out];
+}
 
 describe('buildMemberAvatarSvg', () => {
   it('最終 SVG に var( を一切残さない（リスク#1 回帰）', () => {
@@ -188,6 +196,25 @@ describe('listPartsForSlot / buildPartPreviewSvg（ピッカー・Issue #25）',
     }
   });
 
+  it('item サムネに <style> クラス塗りが残らない（シルエット化バグ回帰）', () => {
+    // hm1-p-000070〜 は Illustrator 書き出しで <style>.stN{fill:#…} + class="stN"。
+    // react-native-svg は <style> の CSS クラスを解決しないため、未処理だと全パスが
+    // 既定の黒＝シルエットに化ける。インライン化で <style> が残らないことを固定する。
+    for (const part of listPartsForSlot('item')) {
+      expect(part.previewSvg).not.toContain('<style');
+    }
+  });
+
+  it('以前シルエット化していた item パーツに実色の塗りが載る（バグ修正の核）', () => {
+    // takoyaki(hm1-p-000073) は <style> クラス塗りのみで、未修正では fill 実色が 0 個
+    // ＝黒一色のシルエット。インライン化後は複数の実色 fill/stroke を持つ。
+    const takoyaki = listPartsForSlot('item').find((p) => p.id === 'hm1-p-000073');
+    expect(takoyaki).toBeDefined();
+    const hexes = fillStrokeHexes((takoyaki as { previewSvg: string }).previewSvg);
+    // 黒(#000000)以外の実色が最低 1 つは載る（シルエットでない）。
+    expect(hexes.some((h) => h !== '#000000')).toBe(true);
+  });
+
   it('列挙は決定的（同入力→同 id 順）', () => {
     const a = listPartsForSlot('head').map((p) => p.id);
     const b = listPartsForSlot('head').map((p) => p.id);
@@ -269,5 +296,53 @@ describe('bakeColorVars', () => {
   it('root 宣言が無いスロットはインライン fallback を使う', () => {
     // root style が無い単発フラグメントでは従来どおり fallback へ畳む（後方互換）。
     expect(bakeColorVars('fill="var(--hm-hair, #1A2B3C)"')).toBe('fill="#1A2B3C"');
+  });
+});
+
+describe('inlineStyleClasses', () => {
+  it('<style> クラス塗りを図形のインライン属性へ畳み <style> を除去する', () => {
+    const input =
+      '<svg><style>.st2{fill:#9e540c;}.st3{fill:#1a6916;}</style>' +
+      '<path class="st2" d="M0 0"/><path class="st3" d="M1 1"/></svg>';
+    const out = inlineStyleClasses(input);
+    expect(out).not.toContain('<style');
+    expect(out).toContain('fill="#9e540c"');
+    expect(out).toContain('fill="#1a6916"');
+  });
+
+  it('カンマ区切り複数セレクタとソース順カスケード（後勝ち）を解決する', () => {
+    const input =
+      '<svg><style>.st0{stroke:#000;}.st0,.st1{fill:none;stroke-width:1.47px;}.st1{stroke:#fff;}</style>' +
+      '<path class="st0" d="M0 0"/><path class="st1" d="M1 1"/></svg>';
+    const out = inlineStyleClasses(input);
+    // st0: stroke は rule1、fill:none と stroke-width はグループ rule。
+    expect(out).toContain('<path class="st0" d="M0 0" stroke="#000" fill="none" stroke-width="1.47"/>');
+    // st1: グループ rule の fill:none/stroke-width に加え、後勝ちで stroke=#fff。
+    expect(out).toContain('stroke="#fff"');
+    // px は SVG ユーザー単位へ正規化（1.47px→1.47）。
+    expect(out).not.toContain('1.47px');
+  });
+
+  it('既存のインライン属性は class より優先し上書きしない', () => {
+    const input =
+      '<svg><style>.st2{fill:#9e540c;}</style><path class="st2" fill="#FFFFFF" d="M0 0"/></svg>';
+    const out = inlineStyleClasses(input);
+    expect(out).toContain('fill="#FFFFFF"');
+    expect(out).not.toContain('fill="#9e540c"');
+  });
+
+  it('クラス宣言値の var(--hm-*) は残し、後段 bakeColorVars が解決できる形にする', () => {
+    const input =
+      '<svg style="--hm-stroke:#000000"><style>.st0{stroke:var(--hm-stroke, #000000);}</style>' +
+      '<path class="st0" d="M0 0"/></svg>';
+    const inlined = inlineStyleClasses(input);
+    expect(inlined).toContain('stroke="var(--hm-stroke, #000000)"');
+    // パイプライン順（inline→bake）で var( は完全に消える。
+    expect(bakeColorVars(inlined)).not.toContain('var(');
+  });
+
+  it('<style> を含まない SVG はそのまま返す（no-op・既存パーツへ無影響）', () => {
+    const input = '<svg><path fill="#CF2323" d="M0 0"/></svg>';
+    expect(inlineStyleClasses(input)).toBe(input);
   });
 });
