@@ -224,6 +224,13 @@ describe('listPartsForSlot / buildPartPreviewSvg（ピッカー・Issue #25）',
     // background は色オプションで別管理するため color スロット一覧に含めない。
     expect(colorIds).not.toContain('background');
   });
+
+  it('色編集 UI は hair/clothes のみ（skin/stroke は除外）', () => {
+    const colorIds = AVATAR_COLOR_SLOTS.map((s) => s.id);
+    expect(colorIds).toEqual(['hair', 'clothes']);
+    expect(colorIds).not.toContain('skin');
+    expect(colorIds).not.toContain('stroke');
+  });
 });
 
 describe('bakeColorVars', () => {

@@ -55,16 +55,14 @@ export const AVATAR_SELECTION_SLOTS: readonly { id: SelectionSlotId; label: stri
 ] as const;
 
 /**
- * UI に並べる色スロット（hair/skin/clothes/stroke の 4 つ）。
+ * UI に並べる色スロット（hair/clothes の 2 つ）。
  * `background` は色スロットとして manifest に存在するが、背景は createAvatar の
  * `background` オプションで別経路管理するため、ここには含めない（既存挙動と整合）。
- * `bottom`（ボトム色）は表示上映らないため編集 UI からは除外している。
+ * `bottom`（ボトム色）・`skin`（肌）・`stroke`（線）は編集 UI からは除外している。
  */
 export const AVATAR_COLOR_SLOTS: readonly { id: ColorSlotId; label: string }[] = [
   { id: 'hair', label: '髪' },
-  { id: 'skin', label: '肌' },
   { id: 'clothes', label: '服' },
-  { id: 'stroke', label: '線' },
 ] as const;
 
 /**
