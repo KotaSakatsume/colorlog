@@ -80,8 +80,10 @@ describe('buildMemberAvatarSvg（config 拡張・Issue #25）', () => {
     expect(recolored).not.toBeNull();
     // 色を変えれば出力も変わる（反映されている）。
     expect(recolored).not.toBe(base);
-    // 焼き込んだ髪色 hex が最終 SVG に現れる。
-    expect((recolored as string).toUpperCase()).toContain('#FF0000');
+    // 焼き込んだ髪色 hex が「実際の塗り属性」に載る（color 反映バグ回帰）。
+    // root の style="--hm-hair:#FF0000" に現れるだけでは react-native-svg は描画しない。
+    // 必ず fill=/stroke= 属性として焼き込まれていること（自前カスケード解決の担保）。
+    expect(/(?:fill|stroke)="#FF0000"/i.test(recolored as string)).toBe(true);
     // 決定的。
     const again = buildMemberAvatarSvg({
       userId: 'c-user',
@@ -238,5 +240,27 @@ describe('bakeColorVars', () => {
   it('カンマ後のスペース有無どちらも吸収する', () => {
     expect(bakeColorVars('fill="var(--hm-skin,#ABCDEF)"')).toBe('fill="#ABCDEF"');
     expect(bakeColorVars('fill="var(--hm-skin, #ABCDEF)"')).toBe('fill="#ABCDEF"');
+  });
+
+  it('root style の上書き値を var() 使用箇所に伝播する（色反映バグ回帰）', () => {
+    // createAvatar は上書き色を root の style="--hm-KEY:#VALUE" にしか載せず、
+    // 各パーツの var() のインライン fallback は元色のまま残す。fallback へ単純に
+    // 潰すと上書き色が捨てられる（= 旧バグ）。宣言マップで実値へ解決すること。
+    const input =
+      '<svg style="--hm-hair:#FF0000;--hm-skin:#FFFFFF">' +
+      '<path fill="var(--hm-hair, #111111)" />' +
+      '<path stroke="var(--hm-skin, #222222)" /></svg>';
+    const out = bakeColorVars(input);
+    // hair はインライン fallback(#111111) ではなく root の上書き値(#FF0000) になる。
+    expect(out).toContain('fill="#FF0000"');
+    expect(out).not.toContain('#111111');
+    // 宣言のない揺れも整合（skin は root 値 #FFFFFF）。
+    expect(out).toContain('stroke="#FFFFFF"');
+    expect(out).not.toContain('var(');
+  });
+
+  it('root 宣言が無いスロットはインライン fallback を使う', () => {
+    // root style が無い単発フラグメントでは従来どおり fallback へ畳む（後方互換）。
+    expect(bakeColorVars('fill="var(--hm-hair, #1A2B3C)"')).toBe('fill="#1A2B3C"');
   });
 });

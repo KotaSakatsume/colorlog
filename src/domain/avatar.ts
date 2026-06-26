@@ -68,15 +68,21 @@ export const AVATAR_COLOR_SLOTS: readonly { id: ColorSlotId; label: string }[] =
 ] as const;
 
 /**
- * `var(--hm-KEY, #HEX)` を fallback hex（または `colors` で上書きされた実 hex）に潰す。
+ * `var(--hm-KEY, #HEX)` 使用箇所。group1=スロット名 / group2=インライン fallback hex。
  *
  * 実出力パターン（Investigator 確認）: `var(--hm-` + lowercase slot 名 +
  * `, ` (カンマ+半角スペース) + `#` + hex。`\s*` で空白の揺れを吸収し、`{3,8}` で
  * 3/4/6/8 桁いずれの hex も拾う。root の `style="--hm-bottom:#000000;..."` は
- * `var(` を含まないので誤爆しない。`fill=` だけでなく `stroke=` 属性にも出るが、
- * 全文一括置換で問題ない。
+ * `var(` を含まないので誤爆しない。`fill=` だけでなく `stroke=` 属性にも出る。
  */
-const HM_VAR_PATTERN = /var\(\s*--hm-[\w-]+\s*,\s*(#[0-9a-fA-F]{3,8})\s*\)/g;
+const HM_VAR_PATTERN = /var\(\s*--hm-([\w-]+)\s*,\s*(#[0-9a-fA-F]{3,8})\s*\)/g;
+
+/**
+ * root の `style="--hm-KEY:#VALUE;..."` 内の custom property 宣言。
+ * group1=スロット名 / group2=解決済みカスケード値。`var(--hm-KEY, #HEX)` 使用箇所は
+ * キーと hex の間が `:` ではなく `, ` なのでこの宣言パターンには一致しない（誤検出なし）。
+ */
+const HM_VAR_DECL_PATTERN = /--hm-([\w-]+)\s*:\s*(#[0-9a-fA-F]{3,8})/g;
 
 /**
  * 部分マップ（`Partial<Record<K, V>>`）を humation の `Record<K, V>` 引数へ橋渡しする。
@@ -112,11 +118,24 @@ export type BuildMemberAvatarSvgInput = {
 const DEFAULT_BACKGROUND = '#E9E8E6';
 
 /**
- * SVG 文字列内に残る `var(--hm-*, #hex)` を fallback hex に置換する。
- * react-native-svg が var() を解決しない罠（リスク#1）を確実に潰すための後段処理。
+ * SVG 文字列内の `var(--hm-KEY, #hex)` を実値へ畳む（react-native-svg は CSS custom
+ * property を解決しない罠＝リスク#1 への後段処理）。
+ *
+ * 重要（色反映バグ修正）: `colors` で上書きした色は root の
+ * `style="--hm-KEY:#VALUE"` にしか載らず、各パーツの `var(--hm-KEY, #fallback)` の
+ * インライン fallback は manifest 既定（＝元色）のまま残る。単純に fallback へ潰すと
+ * ユーザー指定色が捨てられて元色で描画される。よって先に root style の宣言から
+ * KEY→解決値マップを作り、`var()` 使用箇所はそのカスケード値（無ければインライン
+ * fallback）へ置換して CSS カスケードを自前で再現する。
  */
 export function bakeColorVars(svg: string): string {
-  return svg.replace(HM_VAR_PATTERN, '$1');
+  const resolved = new Map<string, string>();
+  for (const decl of svg.matchAll(HM_VAR_DECL_PATTERN)) {
+    resolved.set(decl[1].toLowerCase(), decl[2]);
+  }
+  return svg.replace(HM_VAR_PATTERN, (_full, key: string, fallback: string) =>
+    resolved.get(key.toLowerCase()) ?? fallback,
+  );
 }
 
 /**
