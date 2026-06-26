@@ -51,11 +51,6 @@ export default function AlbumScreen() {
                   </ThemedText>
                 </View>
                 <BestNineMini posts={memberPosts} color={member.color!} />
-                {memberPosts.map((post) => (
-                  <ThemedText key={post.id} type="small" themeColor="textSecondary">
-                    {post.caption}
-                  </ThemedText>
-                ))}
               </View>
             );
           })
