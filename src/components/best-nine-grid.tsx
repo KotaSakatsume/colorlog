@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import type { AssignedColor } from '@/domain/colors';
 import type { BestNineCell } from '@/domain/merge-best-nine';
 import { mergeBestNine } from '@/domain/merge-best-nine';
-import { BEST_NINE_SLOTS, type Post } from '@/domain/types';
+import type { Post } from '@/domain/types';
 import { ThemedText } from '@/components/themed-text';
 import { Radius } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -84,31 +84,6 @@ export function BestNineGrid({ posts, cells, color, onPressSlot, editable = fals
   );
 }
 
-/** アルバム用の小さいベスト9（タップ不可・ラベルなし）。 */
-export function BestNineMini({ posts, color }: { posts: Post[]; color: AssignedColor }) {
-  const bySlot = new Map(posts.map((p) => [p.slotIndex, p]));
-  return (
-    <View style={styles.miniGrid}>
-      {Array.from({ length: BEST_NINE_SLOTS }, (_, slot) => {
-        const post = bySlot.get(slot) ?? null;
-        return (
-          <View key={slot} style={[styles.miniSlot, { backgroundColor: `${color.hex}33` }]}>
-            {post && (
-              <Image
-                source={{ uri: post.thumbURL }}
-                style={styles.image}
-                contentFit="cover"
-                transition={150}
-                recyclingKey={post.id}
-              />
-            )}
-          </View>
-        );
-      })}
-    </View>
-  );
-}
-
 const GAP = 6;
 
 const styles = StyleSheet.create({
@@ -150,17 +125,5 @@ const styles = StyleSheet.create({
   plus: {
     fontSize: 28,
     fontWeight: '300',
-  },
-  miniGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    width: 108,
-    gap: 2,
-  },
-  miniSlot: {
-    width: 34,
-    height: 34,
-    borderRadius: 4,
-    overflow: 'hidden',
   },
 });

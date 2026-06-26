@@ -1,7 +1,7 @@
 import { useLocalSearchParams } from 'expo-router';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
-import { BestNineMini } from '@/components/best-nine-grid';
+import { BestNineGrid } from '@/components/best-nine-grid';
 import { ColorChip } from '@/components/color-chip';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -50,7 +50,7 @@ export default function AlbumScreen() {
                     {memberPosts.length}/9
                   </ThemedText>
                 </View>
-                <BestNineMini posts={memberPosts} color={member.color!} />
+                <BestNineGrid posts={memberPosts} color={member.color!} />
               </View>
             );
           })
