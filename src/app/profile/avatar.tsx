@@ -37,8 +37,12 @@ import { useCurrentUser, useRepositories } from '@/repositories/context';
 
 const PREVIEW_SIZE = 160;
 const THUMB_SIZE = 64;
-/** 色パレットは配布色プールを流用（造形色にもそのまま使える hex 集合）。 */
-const COLOR_PALETTE = COLOR_POOL.map((c) => c.hex);
+/**
+ * 色パレットは配布色プール（造形色にもそのまま使える hex 集合）に、無彩の
+ * 黒・白を加えたもの。配布色プール自体（COLOR_POOL）はメンバー配布・上限に
+ * 連動するため触らず、編集用パレットだけここで拡張する。
+ */
+const COLOR_PALETTE = [...COLOR_POOL.map((c) => c.hex), '#000000', '#FFFFFF'];
 
 export default function EditAvatarScreen() {
   const theme = useTheme();
