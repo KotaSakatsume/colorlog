@@ -14,8 +14,8 @@ const LABELS: Record<string, string> = {
 };
 
 /**
- * 下部タブバーの代わりに、上部の iOS 風セグメンテッドコントロールで画面を切り替える。
- * expo-router の `Tabs` に `tabBar` として渡す（`tabBarPosition: 'top'` と併用）。
+ * 下部の iOS 風セグメンテッドコントロールで画面を切り替える。
+ * expo-router の `Tabs` に `tabBar` として渡す（`tabBarPosition: 'bottom'`）。
  * ルーティング状態は navigator が持つため、ここは描画と tabPress の発火だけを担う。
  */
 export function SegmentedTabBar({ state, navigation }: BottomTabBarProps) {
@@ -28,9 +28,9 @@ export function SegmentedTabBar({ state, navigation }: BottomTabBarProps) {
       style={[
         styles.container,
         {
-          paddingTop: insets.top + Spacing.two,
+          paddingBottom: insets.bottom + Spacing.two,
           backgroundColor: theme.background,
-          borderBottomColor: theme.backgroundElement,
+          borderTopColor: theme.backgroundElement,
         },
       ]}>
       <View style={[styles.track, { backgroundColor: theme.backgroundElement }]}>
@@ -75,8 +75,8 @@ export function SegmentedTabBar({ state, navigation }: BottomTabBarProps) {
 const styles = StyleSheet.create({
   container: {
     paddingHorizontal: Spacing.three,
-    paddingBottom: Spacing.two,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingTop: Spacing.two,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
   track: {
     flexDirection: 'row',
