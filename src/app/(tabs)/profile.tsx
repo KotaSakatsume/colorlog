@@ -8,7 +8,7 @@ import { MemberAvatar } from '@/components/member-avatar';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { UIButton } from '@/components/ui-button';
-import { BottomTabInset, Spacing } from '@/constants/theme';
+import { Spacing } from '@/constants/theme';
 import { COLOR_POOL } from '@/domain/colors';
 import { useCurrentUser, useRepositories } from '@/repositories/context';
 import { useUserTrips } from '@/hooks/use-trips';
@@ -33,7 +33,7 @@ export default function ProfileScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+      <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
         <ScrollView contentContainerStyle={styles.content}>
           <View style={styles.profileHeader}>
             <MemberAvatar
@@ -98,7 +98,7 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   safeArea: { flex: 1 },
-  content: { padding: Spacing.three, paddingBottom: BottomTabInset + Spacing.four, gap: Spacing.two },
+  content: { padding: Spacing.three, paddingBottom: Spacing.four, gap: Spacing.two },
   profileHeader: { alignItems: 'center', gap: 6, paddingVertical: Spacing.four },
   editBtn: { marginTop: Spacing.two, alignSelf: 'stretch' },
   accountStatus: { marginTop: Spacing.two },

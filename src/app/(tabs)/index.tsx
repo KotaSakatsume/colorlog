@@ -6,7 +6,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { TripCard } from '@/components/trip-card';
 import { UIButton } from '@/components/ui-button';
-import { BottomTabInset, Spacing } from '@/constants/theme';
+import { Spacing } from '@/constants/theme';
 import { useCurrentUser } from '@/repositories/context';
 import { useUserTrips } from '@/hooks/use-trips';
 
@@ -16,7 +16,7 @@ export default function HomeScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+      <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
         <View style={styles.header}>
           <ThemedText type="title" style={styles.logo}>
             Colorlog
@@ -68,6 +68,6 @@ const styles = StyleSheet.create({
   logo: { fontSize: 36, lineHeight: 42 },
   actions: { flexDirection: 'row', gap: Spacing.two, marginBottom: Spacing.three },
   action: { flex: 1 },
-  list: { paddingBottom: BottomTabInset + Spacing.four },
+  list: { paddingBottom: Spacing.four },
   empty: { textAlign: 'center', marginTop: Spacing.five },
 });
