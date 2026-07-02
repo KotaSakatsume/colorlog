@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { BestNineGrid } from '@/components/best-nine-grid';
+import { MemberAvatar } from '@/components/member-avatar';
 import { QrInvite } from '@/components/qr-invite';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -182,7 +183,51 @@ export default function TripDetailScreen() {
           {myColor && posts.some((p) => p.userId === user.uid) && (
             <LinkRow label="ストーリーに共有" onPress={() => router.push({ pathname: '/trip/[id]/share', params: { id: trip.id } })} theme={theme} />
           )}
-          <LinkRow label="メンバー一覧" onPress={() => router.push({ pathname: '/trip/[id]/members', params: { id: trip.id } })} theme={theme} />
+        </View>
+
+        {/* メンバー（アイコン）。アイコンタップで個人アルバム、ヘッダーで一覧画面へ。 */}
+        <View style={styles.membersSection}>
+          <Pressable
+            onPress={() => router.push({ pathname: '/trip/[id]/members', params: { id: trip.id } })}
+            style={({ pressed }) => [styles.membersHeader, { opacity: pressed ? 0.6 : 1 }]}>
+            <ThemedText type="smallBold">メンバー</ThemedText>
+            <ThemedText type="smallBold" themeColor="textSecondary">
+              ›
+            </ThemedText>
+          </Pressable>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <View style={styles.membersRow}>
+              {trip.memberIds.map((uid) => {
+                const member = trip.members[uid];
+                return (
+                  <Pressable
+                    key={uid}
+                    // 色があるメンバーだけ個人アルバムへ（未配布はベスト9が存在しない）。
+                    disabled={!member.color}
+                    onPress={() =>
+                      router.push({
+                        pathname: '/trip/[id]/album',
+                        params: { id: trip.id, userId: uid },
+                      })
+                    }
+                    accessibilityRole="button"
+                    accessibilityLabel={`${member.displayName}のアルバム`}
+                    style={({ pressed }) => [styles.memberItem, { opacity: pressed ? 0.7 : 1 }]}>
+                    <MemberAvatar
+                      userId={uid}
+                      color={member.color}
+                      size={48}
+                      fallbackName={member.displayName}
+                      config={uid === user.uid ? user.avatarConfig : undefined}
+                    />
+                    <ThemedText type="small" numberOfLines={1} style={styles.memberName}>
+                      {member.displayName}
+                    </ThemedText>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </ScrollView>
         </View>
 
         {/* 主催者だけがトリップを削除できる */}
@@ -257,6 +302,11 @@ const styles = StyleSheet.create({
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   cameraBtn: { marginTop: Spacing.one },
   links: { gap: Spacing.two, marginTop: Spacing.two },
+  membersSection: { gap: Spacing.two },
+  membersHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one },
+  membersRow: { flexDirection: 'row', gap: Spacing.three },
+  memberItem: { alignItems: 'center', gap: 4, width: 64 },
+  memberName: { textAlign: 'center' },
   linkRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
