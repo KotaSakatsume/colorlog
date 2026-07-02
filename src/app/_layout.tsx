@@ -28,6 +28,10 @@ export default function RootLayout() {
                 options={{ title: 'ベスト9に追加', presentation: 'modal' }}
               />
               <Stack.Screen name="trip/[id]/album" options={{ title: 'アルバム' }} />
+              <Stack.Screen
+                name="trip/[id]/share"
+                options={{ title: 'ストーリーに共有', presentation: 'modal' }}
+              />
               <Stack.Screen name="trip/[id]/members" options={{ title: 'メンバー' }} />
             </Stack>
           </ThemeProvider>

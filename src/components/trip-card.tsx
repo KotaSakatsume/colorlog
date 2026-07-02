@@ -20,15 +20,15 @@ const NOTCH = 18;
 /** 月/日 表記（区間の両端ラベル用）。 */
 const md = (d: Date) => `${d.getMonth() + 1}/${d.getDate()}`;
 
-/** trip.id 由来の決定的な便名フレーバー（例: CL482）。 */
-function flightCode(id: string): string {
+/** trip.id 由来の決定的な便名フレーバー（例: CL482）。ストーリー書き出しでも使う。 */
+export function flightCode(id: string): string {
   let h = 0;
   for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) % 1000;
   return `CL${String(h).padStart(3, '0')}`;
 }
 
-/** trip.id 由来の決定的なバーコード幅列（搭乗券の見た目用・1〜3px）。 */
-function barcodeWidths(id: string): number[] {
+/** trip.id 由来の決定的なバーコード幅列（搭乗券の見た目用・1〜3px）。ストーリー書き出しでも使う。 */
+export function barcodeWidths(id: string): number[] {
   let seed = 0;
   for (let i = 0; i < id.length; i++) seed = (seed * 131 + id.charCodeAt(i)) >>> 0;
   return Array.from({ length: 20 }, () => {
