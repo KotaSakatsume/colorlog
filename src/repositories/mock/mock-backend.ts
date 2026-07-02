@@ -21,6 +21,8 @@ type ReactionsListener = (byPost: Map<string, ReactionSummary>) => void;
  * 束ねた引数なしトリガを登録し、発火時に各自が再集計する（emit 側は集計を持たない）。
  */
 type ReactionsTrigger = () => void;
+/** アルバム拍手のリスナー（ownerUid → 押した人の uid 配列）。 */
+type AlbumClapsListener = (byOwner: Map<string, string[]>) => void;
 
 export class MockBackend {
   private readonly trips = new Map<string, Trip>();
@@ -28,11 +30,14 @@ export class MockBackend {
   private readonly inviteCodes = new Map<string, InviteCode>();
   // postId -> (uid -> ReactionEmoji)。ユーザー1人1絵文字（Firestore の reactions/{uid} 相当）。
   private readonly reactionsByPost = new Map<string, Map<string, ReactionEmoji>>();
+  // tripId -> (ownerUid -> 押した人の uid 集合)。アルバム（ベスト9一式）への拍手。
+  private readonly albumClapsByTrip = new Map<string, Map<string, Set<string>>>();
 
   private readonly tripListeners = new Map<string, Set<TripListener>>();
   private readonly userTripsListeners = new Map<string, Set<UserTripsListener>>();
   private readonly postsListeners = new Map<string, Set<PostsListener>>();
   private readonly reactionListeners = new Map<string, Set<ReactionsTrigger>>();
+  private readonly albumClapListeners = new Map<string, Set<AlbumClapsListener>>();
 
   // --- 初期データ投入（seed 用） -----------------------------------------
 
@@ -167,6 +172,29 @@ export class MockBackend {
     this.reactionsByPost.delete(postId);
   }
 
+  /** トリップ内のアルバム拍手を ownerUid → 押した人の uid 配列で返す。 */
+  getAlbumClaps(tripId: string): Map<string, string[]> {
+    const byOwner = new Map<string, string[]>();
+    for (const [ownerUid, uids] of this.albumClapsByTrip.get(tripId) ?? []) {
+      byOwner.set(ownerUid, [...uids]);
+    }
+    return byOwner;
+  }
+
+  /** アルバム拍手をトグルする。未押下 → 押す / 押下済み → 解除（1人1拍手）。 */
+  toggleAlbumClap(tripId: string, ownerUid: string, uid: string): void {
+    const byOwner = this.albumClapsByTrip.get(tripId) ?? new Map<string, Set<string>>();
+    const uids = byOwner.get(ownerUid) ?? new Set<string>();
+    if (uids.has(uid)) {
+      uids.delete(uid);
+    } else {
+      uids.add(uid);
+    }
+    byOwner.set(ownerUid, uids);
+    this.albumClapsByTrip.set(tripId, byOwner);
+    this.emitAlbumClaps(tripId);
+  }
+
   // --- 購読 ---------------------------------------------------------------
 
   subscribeTrip(tripId: string, listener: TripListener): Unsubscribe {
@@ -208,6 +236,15 @@ export class MockBackend {
     return () => set.delete(trigger);
   }
 
+  /** トリップ内のアルバム拍手を購読する（viewer 非依存の生データなので wrapper 不要）。 */
+  subscribeAlbumClaps(tripId: string, listener: AlbumClapsListener): Unsubscribe {
+    const set = this.albumClapListeners.get(tripId) ?? new Set();
+    set.add(listener);
+    this.albumClapListeners.set(tripId, set);
+    listener(this.getAlbumClaps(tripId)); // 初期値を即時に流す
+    return () => set.delete(listener);
+  }
+
   // --- 通知 ---------------------------------------------------------------
 
   private emitTrip(tripId: string): void {
@@ -226,6 +263,11 @@ export class MockBackend {
    */
   private emitReactions(tripId: string): void {
     this.reactionListeners.get(tripId)?.forEach((trigger) => trigger());
+  }
+
+  private emitAlbumClaps(tripId: string): void {
+    const byOwner = this.getAlbumClaps(tripId);
+    this.albumClapListeners.get(tripId)?.forEach((fn) => fn(byOwner));
   }
 
   /** あるトリップの全メンバーの「自分のトリップ一覧」リスナーへ再通知する。 */

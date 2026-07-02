@@ -24,3 +24,23 @@ export function useTripReactions(tripId: string | undefined): Map<string, Reacti
 
   return byPost;
 }
+
+/**
+ * トリップ内のアルバム拍手（ownerUid → 押した人の uid 配列）を購読する。
+ * viewer 非依存の生データなので、押した/押してないの判定は呼び出し側で行う。
+ */
+export function useAlbumClaps(tripId: string | undefined): Map<string, string[]> {
+  const { posts: postRepo } = useRepositories();
+  const [byOwner, setByOwner] = useState<Map<string, string[]>>(new Map());
+
+  useEffect(() => {
+    if (!tripId) {
+      setByOwner(new Map());
+      return;
+    }
+    const unsubscribe = postRepo.subscribeToAlbumClaps(tripId, setByOwner);
+    return unsubscribe;
+  }, [postRepo, tripId]);
+
+  return byOwner;
+}

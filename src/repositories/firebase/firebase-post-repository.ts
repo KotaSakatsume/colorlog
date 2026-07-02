@@ -33,6 +33,7 @@ import type {
   ImageProcessor,
   PostRepository,
   PromotePhotoInput,
+  ToggleAlbumClapInput,
   ToggleReactionInput,
   Unsubscribe,
 } from '@/repositories/types';
@@ -162,6 +163,40 @@ export class FirebasePostRepository implements PostRepository {
 
       tx.update(postRef, countUpdate);
       return { postId, counts, mine } satisfies ReactionSummary;
+    });
+  }
+
+  subscribeToAlbumClaps(
+    tripId: string,
+    listener: (byOwner: Map<string, string[]>) => void,
+  ): Unsubscribe {
+    // trips/{tripId}/albumClaps/{ownerUid} に { users: { [uid]: true } } を1ドキュメント。
+    // TODO(Firebase本番化): firestore.rules に albumClaps の read/write ルールを追加する
+    //（現状 FIREBASE_ENABLED=false のため未使用。ルール未定義のまま有効化すると reject される）。
+    return onSnapshot(collection(db(), 'trips', tripId, 'albumClaps'), (snap) => {
+      const byOwner = new Map<string, string[]>();
+      snap.forEach((d) => {
+        const users = (d.data() as Record<string, unknown>).users;
+        byOwner.set(d.id, users && typeof users === 'object' ? Object.keys(users) : []);
+      });
+      listener(byOwner);
+    });
+  }
+
+  async toggleAlbumClap(input: ToggleAlbumClapInput): Promise<void> {
+    const { tripId, ownerUid, user } = input;
+    const ref = doc(db(), 'trips', tripId, 'albumClaps', ownerUid);
+    await runTransaction(db(), async (tx) => {
+      const snap = await tx.get(ref);
+      const users: Record<string, true> = snap.exists()
+        ? { ...(((snap.data() as Record<string, unknown>).users as Record<string, true>) ?? {}) }
+        : {};
+      if (users[user.uid]) {
+        delete users[user.uid];
+      } else {
+        users[user.uid] = true;
+      }
+      tx.set(ref, { users });
     });
   }
 
