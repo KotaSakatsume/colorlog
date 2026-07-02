@@ -44,7 +44,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "プロフィール写真の選択に使用します"
+          "photosPermission": "プロフィール写真の選択に使用します",
+          "cameraPermission": "撮影してベスト9に追加するために使用します"
         }
       ],
       [

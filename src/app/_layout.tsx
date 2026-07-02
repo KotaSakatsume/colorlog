@@ -16,7 +16,8 @@ export default function RootLayout() {
           <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
             <AnimatedSplashOverlay />
             <Stack screenOptions={{ headerBackButtonDisplayMode: 'minimal' }}>
-              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen name="index" options={{ headerShown: false }} />
+              <Stack.Screen name="profile/index" options={{ title: 'プロフィール' }} />
               <Stack.Screen name="profile/edit" options={{ title: 'プロフィール編集', presentation: 'modal' }} />
               <Stack.Screen name="profile/avatar" options={{ title: 'アバターを編集' }} />
               <Stack.Screen name="trip/create" options={{ title: 'トリップ作成', presentation: 'modal' }} />
