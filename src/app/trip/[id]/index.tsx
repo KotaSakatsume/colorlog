@@ -178,6 +178,10 @@ export default function TripDetailScreen() {
 
         {/* 他画面への導線 */}
         <View style={styles.links}>
+          {/* 共有は色があり自分の写真が1枚以上あるときだけ出す（空のベスト9は共有価値がない） */}
+          {myColor && posts.some((p) => p.userId === user.uid) && (
+            <LinkRow label="ストーリーに共有" onPress={() => router.push({ pathname: '/trip/[id]/share', params: { id: trip.id } })} theme={theme} />
+          )}
           <LinkRow label="アルバムを見る" onPress={() => router.push({ pathname: '/trip/[id]/album', params: { id: trip.id } })} theme={theme} />
           <LinkRow label="メンバー一覧" onPress={() => router.push({ pathname: '/trip/[id]/members', params: { id: trip.id } })} theme={theme} />
         </View>
