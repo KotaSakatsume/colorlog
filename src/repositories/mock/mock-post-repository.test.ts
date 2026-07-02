@@ -209,3 +209,38 @@ describe('MockBackend リアクションの孤児破棄（リスク3）', () => 
     expect(summary?.mine).toBeNull();
   });
 });
+
+describe('MockPostRepository toggleAlbumClap（アルバム拍手）', () => {
+  it('① トグルで押した人の uid が載り、再トグルで消える（1人1拍手）', async () => {
+    const { db, repo } = setup();
+    const alice = makeUser('alice');
+    await repo.toggleAlbumClap({ tripId: 'trip1', ownerUid: 'owner', user: alice });
+    expect(db.getAlbumClaps('trip1').get('owner')).toEqual(['alice']);
+    await repo.toggleAlbumClap({ tripId: 'trip1', ownerUid: 'owner', user: alice });
+    expect(db.getAlbumClaps('trip1').get('owner')).toEqual([]);
+  });
+
+  it('② owner ごとに独立して集計される', async () => {
+    const { db, repo } = setup();
+    await repo.toggleAlbumClap({ tripId: 'trip1', ownerUid: 'owner', user: makeUser('alice') });
+    await repo.toggleAlbumClap({ tripId: 'trip1', ownerUid: 'other', user: makeUser('alice') });
+    await repo.toggleAlbumClap({ tripId: 'trip1', ownerUid: 'other', user: makeUser('bob') });
+    const byOwner = db.getAlbumClaps('trip1');
+    expect(byOwner.get('owner')).toEqual(['alice']);
+    expect(byOwner.get('other')).toEqual(['alice', 'bob']);
+  });
+
+  it('③ 購読者へ初期値とトグルのたびに通知される', async () => {
+    const { repo } = setup();
+    const seen: Map<string, string[]>[] = [];
+    const unsubscribe = repo.subscribeToAlbumClaps('trip1', (byOwner) => seen.push(byOwner));
+    expect(seen).toHaveLength(1); // 初期値の即時通知
+    expect(seen[0].size).toBe(0);
+    await repo.toggleAlbumClap({ tripId: 'trip1', ownerUid: 'owner', user: makeUser('alice') });
+    expect(seen).toHaveLength(2);
+    expect(seen[1].get('owner')).toEqual(['alice']);
+    unsubscribe();
+    await repo.toggleAlbumClap({ tripId: 'trip1', ownerUid: 'owner', user: makeUser('bob') });
+    expect(seen).toHaveLength(2); // 解除後は通知されない
+  });
+});

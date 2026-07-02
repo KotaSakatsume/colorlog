@@ -93,6 +93,15 @@ export type ToggleReactionInput = {
   emoji: ReactionEmoji;
 };
 
+/** アルバム拍手のトグル入力。 */
+export type ToggleAlbumClapInput = {
+  tripId: string;
+  /** 拍手を受けるアルバムの持ち主。 */
+  ownerUid: string;
+  /** 押す人（現在ユーザー）。 */
+  user: AuthUser;
+};
+
 /** プロフィール更新で変更できる項目。 */
 export type ProfileUpdate = Partial<Pick<AuthUser, 'displayName' | 'photoURL' | 'avatarConfig'>>;
 
@@ -171,6 +180,19 @@ export interface PostRepository {
    * 戻り値は更新後の当該 Post の集計（呼び出し側が即時利用したい場合用）。
    */
   toggleReaction(input: ToggleReactionInput): Promise<ReactionSummary>;
+
+  /**
+   * トリップ内のアルバム拍手（メンバーのベスト9一式への👏）を購読する。
+   * listener には ownerUid → 押した人の uid 配列の Map を流す。
+   * 表示側は trip.members から uid の色・アバターを解決する。
+   */
+  subscribeToAlbumClaps(
+    tripId: string,
+    listener: (byOwner: Map<string, string[]>) => void,
+  ): Unsubscribe;
+
+  /** アルバム拍手をトグルする。未押下 → 押す / 押下済み → 解除（1人1拍手）。 */
+  toggleAlbumClap(input: ToggleAlbumClapInput): Promise<void>;
 }
 
 /**

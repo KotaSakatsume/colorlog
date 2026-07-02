@@ -4,6 +4,7 @@ import { generateId } from '@/domain/id';
 import type {
   PostRepository,
   PromotePhotoInput,
+  ToggleAlbumClapInput,
   ToggleReactionInput,
   Unsubscribe,
 } from '@/repositories/types';
@@ -31,6 +32,17 @@ export class MockPostRepository implements PostRepository {
     // 更新後の当該 post の集計を viewer 視点で返す。
     const summary = this.db.summarizeReactions(tripId, user.uid).get(postId);
     return summary ?? { postId, counts: {}, mine: null };
+  }
+
+  subscribeToAlbumClaps(
+    tripId: string,
+    listener: (byOwner: Map<string, string[]>) => void,
+  ): Unsubscribe {
+    return this.db.subscribeAlbumClaps(tripId, listener);
+  }
+
+  async toggleAlbumClap(input: ToggleAlbumClapInput): Promise<void> {
+    this.db.toggleAlbumClap(input.tripId, input.ownerUid, input.user.uid);
   }
 
   async promotePhoto(input: PromotePhotoInput): Promise<Post> {
