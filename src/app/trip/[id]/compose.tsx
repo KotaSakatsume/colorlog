@@ -27,8 +27,10 @@ function useCandidates(seedKey: string): string[] {
 
 export default function ComposeScreen() {
   const theme = useTheme();
-  const params = useLocalSearchParams<{ id: string; slot?: string }>();
+  const params = useLocalSearchParams<{ id: string; slot?: string; photoUri?: string }>();
   const tripId = params.id;
+  // ホームのシャッターで撮った1枚。あれば候補の先頭に置き、選択済みで開く。
+  const shotUri = typeof params.photoUri === 'string' && params.photoUri ? params.photoUri : undefined;
   const user = useCurrentUser();
   const { uploadQueue } = useRepositories();
   const { trip } = useTrip(tripId);
@@ -41,14 +43,15 @@ export default function ComposeScreen() {
   const filledSlots = new Set(cells.filter((c) => c.state !== 'empty').map((c) => c.slotIndex));
   const myColor = trip?.members[user.uid]?.color;
 
-  const candidates = useCandidates(`${tripId}-${user.uid}`);
+  const mockCandidates = useCandidates(`${tripId}-${user.uid}`);
+  const candidates = shotUri ? [shotUri, ...mockCandidates] : mockCandidates;
 
   const firstEmpty = Array.from({ length: BEST_NINE_SLOTS }, (_, i) => i).find(
     (i) => !filledSlots.has(i),
   );
   const initialSlot = params.slot !== undefined ? Number(params.slot) : firstEmpty;
 
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string | null>(shotUri ?? null);
   const [targetSlot, setTargetSlot] = useState<number | undefined>(initialSlot);
   const [caption, setCaption] = useState('');
   const [submitting, setSubmitting] = useState(false);

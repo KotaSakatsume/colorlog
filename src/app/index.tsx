@@ -1,3 +1,4 @@
+import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { Alert, FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -26,12 +27,23 @@ export default function HomeScreen() {
   const activeTrip = trips.find((t) => t.status === 'active');
   const myActiveColor = activeTrip?.members[user.uid]?.color;
 
-  function handleShutter() {
+  async function handleShutter() {
     if (!activeTrip) {
       Alert.alert('開催中のトリップがありません', '旅がはじまると、ここから撮影できます。');
       return;
     }
-    router.push({ pathname: '/trip/[id]/compose', params: { id: activeTrip.id } });
+    // 端末カメラを起動し、撮れた1枚を compose に渡して公開フローへ乗せる。
+    const perm = await ImagePicker.requestCameraPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert('カメラを使用できません', '設定からカメラへのアクセスを許可してください。');
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({ quality: 0.8 });
+    if (result.canceled || !result.assets?.[0]) return;
+    router.push({
+      pathname: '/trip/[id]/compose',
+      params: { id: activeTrip.id, photoUri: result.assets[0].uri },
+    });
   }
 
   return (
