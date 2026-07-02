@@ -182,7 +182,6 @@ export default function TripDetailScreen() {
           {myColor && posts.some((p) => p.userId === user.uid) && (
             <LinkRow label="ストーリーに共有" onPress={() => router.push({ pathname: '/trip/[id]/share', params: { id: trip.id } })} theme={theme} />
           )}
-          <LinkRow label="アルバムを見る" onPress={() => router.push({ pathname: '/trip/[id]/album', params: { id: trip.id } })} theme={theme} />
           <LinkRow label="メンバー一覧" onPress={() => router.push({ pathname: '/trip/[id]/members', params: { id: trip.id } })} theme={theme} />
         </View>
 

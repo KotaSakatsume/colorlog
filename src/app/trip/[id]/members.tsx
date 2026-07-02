@@ -1,5 +1,5 @@
-import { useLocalSearchParams } from 'expo-router';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { router, useLocalSearchParams } from 'expo-router';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { ColorChip } from '@/components/color-chip';
 import { MemberAvatar } from '@/components/member-avatar';
@@ -33,10 +33,19 @@ export default function MembersScreen() {
           const member = trip.members[uid];
           const isHost = trip.hostUserId === uid;
           const isMe = me.uid === uid;
+          // 色があるメンバーだけアルバムへ飛べる（未配布はベスト9が存在しない）。
+          const canOpenAlbum = !!member.color;
           return (
-            <View
+            <Pressable
               key={uid}
-              style={[styles.row, { backgroundColor: theme.backgroundElement }]}>
+              disabled={!canOpenAlbum}
+              onPress={() =>
+                router.push({ pathname: '/trip/[id]/album', params: { id: trip.id, userId: uid } })
+              }
+              style={({ pressed }) => [
+                styles.row,
+                { backgroundColor: theme.backgroundElement, opacity: pressed ? 0.85 : 1 },
+              ]}>
               <MemberAvatar
                 userId={uid}
                 color={member.color}
@@ -60,7 +69,12 @@ export default function MembersScreen() {
                   未配布
                 </ThemedText>
               )}
-            </View>
+              {canOpenAlbum && (
+                <ThemedText type="smallBold" themeColor="textSecondary">
+                  ›
+                </ThemedText>
+              )}
+            </Pressable>
           );
         })}
       </ScrollView>

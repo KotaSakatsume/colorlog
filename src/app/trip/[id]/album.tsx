@@ -1,4 +1,4 @@
-import { useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams } from 'expo-router';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { BestNineGrid } from '@/components/best-nine-grid';
@@ -9,7 +9,8 @@ import { Spacing } from '@/constants/theme';
 import { useTrip, useTripPosts } from '@/hooks/use-trips';
 
 export default function AlbumScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  // userId 指定時は単一メンバーのアルバム（メンバー一覧からの遷移）。
+  const { id, userId } = useLocalSearchParams<{ id: string; userId?: string }>();
   const { trip } = useTrip(id);
   const { posts } = useTripPosts(id);
 
@@ -23,16 +24,22 @@ export default function AlbumScreen() {
     );
   }
 
-  // 色を持つメンバーだけを並べる（配布済み前提のパレット表示）。
+  // 色を持つメンバーだけを並べる（配布済み前提のパレット表示）。userId 指定時はその1人に絞る。
   const rows = trip.memberIds
+    .filter((uid) => (userId ? uid === userId : true))
     .map((uid) => ({ uid, member: trip.members[uid] }))
     .filter((r) => r.member?.color);
 
+  const single = userId ? trip.members[userId] : undefined;
+
   return (
     <ThemedView style={styles.container}>
+      {single && <Stack.Screen options={{ title: `${single.displayName}のアルバム` }} />}
       <ScrollView contentContainerStyle={styles.content}>
         <ThemedText type="small" themeColor="textSecondary">
-          {trip.name} のベスト9を色ごとに。
+          {single
+            ? `${trip.name} での ${single.displayName} のベスト9。`
+            : `${trip.name} のベスト9を色ごとに。`}
         </ThemedText>
         {rows.length === 0 ? (
           <ThemedText type="small" themeColor="textSecondary" style={styles.empty}>
