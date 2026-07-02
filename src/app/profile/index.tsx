@@ -33,7 +33,8 @@ export default function ProfileScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+      {/* スタックのヘッダーが上を占めるため top は不要。 */}
+      <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
         <ScrollView contentContainerStyle={styles.content}>
           <View style={styles.profileHeader}>
             <MemberAvatar
